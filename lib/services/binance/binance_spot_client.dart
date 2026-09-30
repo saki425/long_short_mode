@@ -1,0 +1,3 @@
+class BinanceSpotClient {
+  const BinanceSpotClient();
+}

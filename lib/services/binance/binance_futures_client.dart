@@ -1,0 +1,3 @@
+class BinanceFuturesClient {
+  const BinanceFuturesClient();
+}

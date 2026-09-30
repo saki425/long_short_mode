@@ -1,0 +1,3 @@
+class SpotGridEngine {
+  const SpotGridEngine();
+}

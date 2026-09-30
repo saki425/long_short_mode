@@ -1,0 +1,3 @@
+class BinanceUserStreamService {
+  const BinanceUserStreamService();
+}

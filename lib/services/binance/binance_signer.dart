@@ -1,0 +1,3 @@
+class BinanceSigner {
+  const BinanceSigner();
+}

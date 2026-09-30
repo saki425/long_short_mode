@@ -1,0 +1,3 @@
+class BinanceWebsocketService {
+  const BinanceWebsocketService();
+}
