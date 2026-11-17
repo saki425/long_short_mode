@@ -145,6 +145,7 @@ class _FuturesUserDataSession {
   IOWebSocketChannel? channel;
   StreamSubscription<dynamic>? subscription;
   Timer? keepAliveTimer;
+  Timer? healthCheckTimer;
   Timer? reconnectTimer;
   String? listenKey;
   final Set<String> consumers = {};
@@ -201,6 +202,8 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
   static const String autoSpotGridOrderLimitKey = 'autoSpotGridOrderLimitUsdt';
   static const String autoSpotGridDailyTurnoverLimitKey =
       'autoSpotGridDailyTurnoverLimitUsdt';
+  static const futuresUserDataHealthCheckInterval = Duration(minutes: 10);
+  static const futuresUserDataPingInterval = Duration(seconds: 20);
 
   BinanceServerTimeService? _timeService;
   BinanceSpotAccountClient? _spotClient;
@@ -308,19 +311,41 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         keyProfileId: _spotKeyProfileId,
       );
 
-  Future<Decimal> manualFuturesOrderLimit({String? symbol}) => _decimalSetting(
-        manualFuturesOrderLimitKey,
-        Decimal.fromInt(5),
-        symbol: symbol ?? _futuresClientSymbol,
-        keyProfileId: _futuresKeyProfileId,
-      );
+  Future<Decimal> manualFuturesOrderLimit({String? symbol}) async {
+    final resolvedSymbol = symbol?.trim().toUpperCase() ?? _futuresClientSymbol;
+    return _decimalSetting(
+      manualFuturesOrderLimitKey,
+      Decimal.fromInt(5),
+      symbol: resolvedSymbol,
+      keyProfileId: await _futuresProfileIdForSetting(resolvedSymbol),
+    );
+  }
 
-  Future<Decimal> manualFuturesShortLimit({String? symbol}) => _decimalSetting(
-        manualFuturesShortLimitKey,
-        Decimal.fromInt(10),
-        symbol: symbol ?? _futuresClientSymbol,
-        keyProfileId: _futuresKeyProfileId,
+  Future<Decimal> manualFuturesShortLimit({String? symbol}) async {
+    final resolvedSymbol = symbol?.trim().toUpperCase() ?? _futuresClientSymbol;
+    return _decimalSetting(
+      manualFuturesShortLimitKey,
+      Decimal.fromInt(10),
+      symbol: resolvedSymbol,
+      keyProfileId: await _futuresProfileIdForSetting(resolvedSymbol),
+    );
+  }
+
+  Future<String?> _futuresProfileIdForSetting(String? symbol) async {
+    final normalized = symbol?.trim().toUpperCase();
+    final provider = _clientProvider;
+    if (provider != null && normalized != null && normalized.isNotEmpty) {
+      final binding = await provider.profileService.getBinding(
+        symbol: normalized,
+        environment: 'live',
       );
+      return binding?.futuresKeyProfileId;
+    }
+    if (normalized == null || normalized == _futuresClientSymbol) {
+      return _futuresKeyProfileId;
+    }
+    return null;
+  }
 
   Future<Decimal> autoSpotGridOrderLimit({String? symbol}) => _decimalSetting(
         autoSpotGridOrderLimitKey,
@@ -585,7 +610,10 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
       );
       final listenKey = await client.createListenKey();
       final uri = Uri.parse('wss://fstream.binance.com/ws/$listenKey');
-      final channel = IOWebSocketChannel.connect(uri);
+      final channel = IOWebSocketChannel.connect(
+        uri,
+        pingInterval: futuresUserDataPingInterval,
+      );
       session.listenKey = listenKey;
       session.channel = channel;
       session.lastEventAt = null;
@@ -624,6 +652,11 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
       session.keepAliveTimer = Timer.periodic(
         const Duration(minutes: 25),
         (_) => unawaited(_keepAliveFuturesUserDataListenKey(keyProfileId)),
+      );
+      session.healthCheckTimer?.cancel();
+      session.healthCheckTimer = Timer.periodic(
+        futuresUserDataHealthCheckInterval,
+        (_) => unawaited(_checkFuturesUserDataHealth(keyProfileId)),
       );
       await _logRepository.append(
         level: 'info',
@@ -1656,6 +1689,7 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         normalizedSymbol,
       );
       await _ensureManualFuturesOrderLimit(
+        symbol: normalizedSymbol,
         notional: quantizedPrice * quantizedQuantity,
         side: side,
         reduceOnly: reduceOnly,
@@ -1725,6 +1759,7 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         throw StateError(_futuresMarketRuleError(quantity, reference));
       }
       await _ensureManualFuturesOrderLimit(
+        symbol: normalizedSymbol,
         notional: reference * quantizedQuantity,
         side: side,
         reduceOnly: reduceOnly,
@@ -1799,6 +1834,7 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         throw StateError(_futuresMarketRuleError(quantity, reference));
       }
       await _ensureManualFuturesOrderLimit(
+        symbol: normalizedSymbol,
         notional: reference * quantizedQuantity,
         side: side,
         reduceOnly: reduceOnly,
@@ -1824,6 +1860,81 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         positionSide: 'SHORT',
         gridLevelId: gridLevelId,
         purpose: purpose ?? (side == 'SELL' ? 'increaseHedge' : 'reduceHedge'),
+      );
+    });
+  }
+
+  Future<String> placeHedgeFuturesStopMarketOrder({
+    required String strategyId,
+    required String side,
+    required Decimal quantity,
+    required Decimal stopPrice,
+    String symbol = 'BTCUSDT',
+    int leverage = 1,
+    String source = 'autoHedge',
+    String? purpose,
+    String? gridLevelId,
+  }) async {
+    return _runFuturesTradeOperation(symbol, () async {
+      _ensureWritesAllowed();
+      final normalizedSymbol = symbol.toUpperCase();
+      await connectFuturesForSymbol(normalizedSymbol);
+      final rules = await ensureFuturesRules(symbol: normalizedSymbol);
+      final client = _futuresClient;
+      if (client == null || _futuresClientSymbol != normalizedSymbol) {
+        throw StateError('Futures live not connected for $normalizedSymbol');
+      }
+      final isRecoveryEntry = side == 'SELL' && purpose == 'recoveryShortEntry';
+      final isRecoveryExit = side == 'BUY' && purpose == 'recoveryShortExit';
+      if (!isRecoveryEntry && !isRecoveryExit) {
+        throw StateError(
+          'Only Recovery short entry SELL or exit BUY stop orders are supported',
+        );
+      }
+      await _ensureFuturesLeverage(
+        symbol: normalizedSymbol,
+        leverage: leverage,
+      );
+      final quantizedStopPrice = rules.quantizePrice(stopPrice);
+      final quantizedQuantity = rules.quantizeQuantity(quantity);
+      if (!rules.isAcceptableOrder(
+        price: quantizedStopPrice,
+        quantity: quantizedQuantity,
+      )) {
+        throw StateError(_futuresMarketRuleError(quantity, quantizedStopPrice));
+      }
+      await _ensureManualFuturesOrderLimit(
+        symbol: normalizedSymbol,
+        // A reduce-only BUY is checked against the current position size. Use
+        // the current reference price for that risk check, because its stop
+        // price can be above the current mark while the short is profitable.
+        notional: isRecoveryExit
+            ? _futuresReferencePrice(normalizedSymbol) * quantizedQuantity
+            : quantizedStopPrice * quantizedQuantity,
+        side: side,
+        reduceOnly: isRecoveryExit,
+        allowExistingLongExposure: isRecoveryEntry,
+        currentShortNotional: await _currentFuturesShortNotional(
+          normalizedSymbol,
+        ),
+        currentLongNotional: await _currentFuturesLongNotional(
+          normalizedSymbol,
+        ),
+      );
+      final clientOrderId = _clientOrderId('GH_LIVE_HEDGE_FUTURES');
+      return _executeFuturesOrder(
+        clientOrderId: clientOrderId,
+        symbol: normalizedSymbol,
+        strategyId: strategyId,
+        source: source,
+        side: side,
+        quantity: quantizedQuantity,
+        price: quantizedStopPrice,
+        reduceOnly: isRecoveryExit,
+        orderType: 'STOP_MARKET',
+        positionSide: 'SHORT',
+        gridLevelId: gridLevelId,
+        purpose: purpose!,
       );
     });
   }
@@ -1973,6 +2084,7 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
   }
 
   Future<void> _ensureManualFuturesOrderLimit({
+    required String symbol,
     required Decimal notional,
     required String side,
     required bool reduceOnly,
@@ -1981,8 +2093,8 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
     required Decimal currentShortNotional,
     required Decimal currentLongNotional,
   }) async {
-    final orderLimit = await manualFuturesOrderLimit();
-    final shortLimit = await manualFuturesShortLimit();
+    final orderLimit = await manualFuturesOrderLimit(symbol: symbol);
+    final shortLimit = await manualFuturesShortLimit(symbol: symbol);
     if (!reduceOnly && notional > orderLimit) {
       throw StateError('Futures order notional exceeds $orderLimit USDT');
     }
@@ -1996,7 +2108,10 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
       throw StateError('Long futures exposure is disabled for live futures');
     }
     if (side == 'SELL' && !reduceOnly) {
-      final projected = currentShortNotional + notional;
+      final pendingShortNotional = await pendingFuturesShortNotional(
+        symbol: symbol,
+      );
+      final projected = currentShortNotional + pendingShortNotional + notional;
       if (projected > shortLimit) {
         throw StateError('Futures short notional exceeds $shortLimit USDT');
       }
@@ -2261,15 +2376,25 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
               positionSide: resolvedPositionSide,
               reduceOnly: reduceOnly,
             )
-          : await client.placeLimitOrder(
-              symbol: symbol,
-              side: side,
-              quantity: quantity,
-              price: price,
-              clientOrderId: clientOrderId,
-              positionSide: resolvedPositionSide,
-              reduceOnly: reduceOnly,
-            );
+          : orderType == 'STOP_MARKET'
+              ? await client.placeStopMarketOrder(
+                  symbol: symbol,
+                  side: side,
+                  quantity: quantity,
+                  stopPrice: price,
+                  clientOrderId: clientOrderId,
+                  positionSide: resolvedPositionSide,
+                  reduceOnly: reduceOnly,
+                )
+              : await client.placeLimitOrder(
+                  symbol: symbol,
+                  side: side,
+                  quantity: quantity,
+                  price: price,
+                  clientOrderId: clientOrderId,
+                  positionSide: resolvedPositionSide,
+                  reduceOnly: reduceOnly,
+                );
       await _mergeFuturesOrderResponse(orderId, response);
       await refreshFuturesSnapshotForSymbol(symbol);
       return orderId;
@@ -2649,17 +2774,28 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         : Decimal.tryParse(row.btcFree) ?? Decimal.zero;
   }
 
-  Future<Decimal> currentFuturesLongQuantity(String symbol) =>
-      _currentFuturesLongQuantity(symbol);
+  Future<Decimal> currentFuturesLongQuantity(
+    String symbol, {
+    String? keyProfileId,
+  }) =>
+      _currentFuturesLongQuantity(symbol, keyProfileId: keyProfileId);
 
-  Future<Decimal> currentFuturesShortQuantity(String symbol) =>
-      _currentFuturesShortQuantity(symbol);
+  Future<Decimal> currentFuturesShortQuantity(
+    String symbol, {
+    String? keyProfileId,
+  }) =>
+      _currentFuturesShortQuantity(symbol, keyProfileId: keyProfileId);
 
-  Future<Decimal> _currentFuturesLongQuantity(String symbol) async {
+  Future<Decimal> _currentFuturesLongQuantity(
+    String symbol, {
+    String? keyProfileId,
+  }) async {
+    final profileScope = _profileScope(keyProfileId ?? _futuresKeyProfileId);
     final rows = await (_db.select(_db.futuresPositions)
           ..where(
             (tbl) =>
                 tbl.symbol.equals(symbol.toUpperCase()) &
+                tbl.keyProfileId.equals(profileScope) &
                 tbl.positionSide.isIn(['LONG', 'BOTH']),
           ))
         .get();
@@ -2673,11 +2809,16 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
     return total;
   }
 
-  Future<Decimal> _currentFuturesShortQuantity(String symbol) async {
+  Future<Decimal> _currentFuturesShortQuantity(
+    String symbol, {
+    String? keyProfileId,
+  }) async {
+    final profileScope = _profileScope(keyProfileId ?? _futuresKeyProfileId);
     final rows = await (_db.select(_db.futuresPositions)
           ..where(
             (tbl) =>
                 tbl.symbol.equals(symbol.toUpperCase()) &
+                tbl.keyProfileId.equals(profileScope) &
                 tbl.positionSide.isIn(['SHORT', 'BOTH']),
           ))
         .get();
@@ -2699,6 +2840,49 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
   Future<Decimal> _currentFuturesShortNotional(String symbol) async {
     final short = await _currentFuturesShortQuantity(symbol);
     return short.abs() * _futuresReferencePrice(symbol);
+  }
+
+  Future<Decimal> pendingFuturesShortNotional({String? symbol}) async {
+    final normalizedSymbol =
+        (symbol ?? _futuresClientSymbol ?? '').toUpperCase();
+    if (normalizedSymbol.isEmpty) {
+      return Decimal.zero;
+    }
+    final profileScope = _profileScope(_futuresKeyProfileId);
+    final rows = await (_db.select(_db.orders)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals('live') &
+                tbl.marketType.equals('usdtFutures') &
+                tbl.symbol.equals(normalizedSymbol) &
+                tbl.keyProfileId.equals(profileScope) &
+                tbl.side.equals('SELL') &
+                tbl.reduceOnly.equals(false) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'pending',
+                  'open',
+                  'accepted',
+                  'partiallyFilled',
+                  'partially_filled',
+                  'partiallyfilled',
+                ]),
+          ))
+        .get();
+    var total = Decimal.zero;
+    for (final row in rows) {
+      final original = Decimal.tryParse(row.originalQuantity) ?? Decimal.zero;
+      final executed = Decimal.tryParse(row.executedQuantity) ?? Decimal.zero;
+      final remaining =
+          original > executed ? original - executed : Decimal.zero;
+      final price = Decimal.tryParse(row.price ?? '') ?? Decimal.zero;
+      if (remaining > Decimal.zero && price > Decimal.zero) {
+        total += remaining * price;
+      }
+    }
+    return total;
   }
 
   Future<String> _currentPositionMode({String symbol = 'BTCUSDT'}) async {
@@ -2726,8 +2910,13 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
     final normalizedSymbol = symbol.toUpperCase();
     final targetLeverage = leverage.clamp(1, 125);
     await refreshFuturesSnapshotForSymbol(normalizedSymbol);
+    final profileScope = _profileScope(_futuresKeyProfileId);
     final positions = await (_db.select(_db.futuresPositions)
-          ..where((tbl) => tbl.symbol.equals(normalizedSymbol)))
+          ..where(
+            (tbl) =>
+                tbl.symbol.equals(normalizedSymbol) &
+                tbl.keyProfileId.equals(profileScope),
+          ))
         .get();
     final currentLeverages = positions
         .map((position) => int.tryParse(position.leverage ?? '') ?? 0)
@@ -3118,6 +3307,28 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
     }
   }
 
+  Future<void> _checkFuturesUserDataHealth(String keyProfileId) async {
+    final session = _futuresUserDataSessions[keyProfileId];
+    if (session == null ||
+        !session.enabled ||
+        session.connecting ||
+        session.reconnectTimer?.isActive == true) {
+      return;
+    }
+    // Transport-level ping/pong detects a half-open socket. This timer handles
+    // the other failure mode: a session that is no longer ready but did not
+    // produce a stream error or onDone callback.
+    if (session.channel != null &&
+        session.wsStatus == BinanceAccountStreamStatus.ready) {
+      return;
+    }
+    await _handleFuturesUserDataDisconnect(
+      symbol: session.symbol,
+      keyProfileId: keyProfileId,
+      error: StateError('Futures user data stream health check failed'),
+    );
+  }
+
   Future<void> _handleFuturesUserDataDisconnect({
     required String symbol,
     required String keyProfileId,
@@ -3152,11 +3363,25 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
         if (stackTrace != null) 'stackTrace': stackTrace.toString(),
       }),
     );
-    await _refreshFuturesSnapshotFromUserData(
-      symbol,
-      keyProfileId: keyProfileId,
-    );
-    _scheduleFuturesUserDataReconnect(keyProfileId);
+    try {
+      await _refreshFuturesSnapshotFromUserData(
+        symbol,
+        keyProfileId: keyProfileId,
+      );
+    } catch (refreshError) {
+      await _logRepository.append(
+        level: 'warning',
+        module: 'FUTURES_USER_STREAM',
+        message: 'Futures user data fallback snapshot failed during reconnect',
+        extraJson: jsonEncode({
+          'symbol': symbol.toUpperCase(),
+          'keyProfileId': keyProfileId,
+          'error': refreshError.toString(),
+        }),
+      );
+    } finally {
+      _scheduleFuturesUserDataReconnect(keyProfileId);
+    }
   }
 
   void _scheduleFuturesUserDataReconnect(String keyProfileId) {
@@ -3198,6 +3423,8 @@ class LiveExchangeExecutionService implements ExchangeExecutionService {
   }) async {
     session.keepAliveTimer?.cancel();
     session.keepAliveTimer = null;
+    session.healthCheckTimer?.cancel();
+    session.healthCheckTimer = null;
     await session.subscription?.cancel();
     session.subscription = null;
     final channel = session.channel;

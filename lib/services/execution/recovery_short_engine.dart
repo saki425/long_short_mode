@@ -44,13 +44,20 @@ class RecoveryShortEngine {
 
   final Map<String, Decimal> _previousPrices = {};
   final Set<String> _processingStrategies = {};
+  final Set<String> _userStreamConsumerKeys = {};
   StreamSubscription<Map<String, MarketTick>>? _tickSubscription;
+  StreamSubscription<FuturesUserOrderUpdate>? _orderSubscription;
   bool _startupRecoveryStarted = false;
 
   void start() {
     _tickSubscription ??= marketData.allMarketTicksStream.listen((ticks) {
       unawaited(_onTicks(ticks));
     });
+    _orderSubscription ??= liveExecution.futuresUserOrderUpdates
+        .where((event) => event.source == source)
+        .listen((event) {
+          unawaited(reconcileStrategy(event.strategyId));
+        });
     if (!_startupRecoveryStarted) {
       _startupRecoveryStarted = true;
       unawaited(recoverRunningStrategies());
@@ -59,19 +66,25 @@ class RecoveryShortEngine {
 
   Future<void> dispose() async {
     await _tickSubscription?.cancel();
+    await _orderSubscription?.cancel();
+    for (final consumerKey in _userStreamConsumerKeys) {
+      await liveExecution.stopFuturesUserDataStream(consumerKey: consumerKey);
+    }
+    _userStreamConsumerKeys.clear();
   }
 
   Stream<List<RecoveryShortLevel>> watchLevels(String strategyId) {
-    final query = db.select(db.recoveryShortLevels)
-      ..where((tbl) => tbl.strategyId.equals(strategyId))
-      ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]);
+    final query =
+        db.select(db.recoveryShortLevels)
+          ..where((tbl) => tbl.strategyId.equals(strategyId))
+          ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]);
     return query.watch();
   }
 
   Future<RecoveryShortStats> loadStats(String strategyId) async {
-    final rows = await (db.select(db.recoveryShortLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategyId)))
-        .get();
+    final rows =
+        await (db.select(db.recoveryShortLevels)
+          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
     Decimal totalShort = Decimal.zero;
     for (final row in rows) {
       if (_isOpenStatus(row.status)) {
@@ -83,13 +96,14 @@ class RecoveryShortEngine {
       ready: rows.where((row) => row.status == statusReadyToEnter).length,
       open: rows.where((row) => row.status == statusOpen).length,
       armedExit: rows.where((row) => row.status == statusArmedExit).length,
-      submitting: rows
-          .where(
-            (row) =>
-                row.status == statusEnterSubmitting ||
-                row.status == statusExitSubmitting,
-          )
-          .length,
+      submitting:
+          rows
+              .where(
+                (row) =>
+                    row.status == statusEnterSubmitting ||
+                    row.status == statusExitSubmitting,
+              )
+              .length,
       closedWaitingRearm:
           rows.where((row) => row.status == statusClosedWaitingRearm).length,
       failed: rows.where((row) => row.status == statusFailed).length,
@@ -110,25 +124,30 @@ class RecoveryShortEngine {
         marketData.latestFuturesMarkPriceFor(strategy.symbol)?.markPrice;
     final longExposure = await _longExposure(strategyId, center);
     final shortExposure = await _shortExposure(strategyId);
-    final longPnl = markPrice == null
-        ? Decimal.zero
-        : (markPrice - longExposure.longAvgPrice) * longExposure.totalLongQty;
-    final shortPnl = markPrice == null
-        ? Decimal.zero
-        : (shortExposure.shortAvgPrice - markPrice) *
-            shortExposure.totalShortQty;
+    final longPnl =
+        markPrice == null
+            ? Decimal.zero
+            : (markPrice - longExposure.longAvgPrice) *
+                longExposure.totalLongQty;
+    final shortPnl =
+        markPrice == null
+            ? Decimal.zero
+            : (shortExposure.shortAvgPrice - markPrice) *
+                shortExposure.totalShortQty;
     final combinedPnl = longPnl + shortPnl;
     final netQuantity = longExposure.totalLongQty - shortExposure.totalShortQty;
     final longLoss = longPnl < Decimal.zero ? -longPnl : Decimal.zero;
-    final offsetAmount = longLoss > Decimal.zero && shortPnl > Decimal.zero
-        ? (shortPnl < longLoss ? shortPnl : longLoss)
-        : Decimal.zero;
-    final offsetRatio = longLoss > Decimal.zero
-        ? (offsetAmount / longLoss).toDecimal(
-              scaleOnInfinitePrecision: 12,
-            ) *
-            Decimal.fromInt(100)
-        : Decimal.zero;
+    final offsetAmount =
+        longLoss > Decimal.zero && shortPnl > Decimal.zero
+            ? (shortPnl < longLoss ? shortPnl : longLoss)
+            : Decimal.zero;
+    final offsetRatio =
+        longLoss > Decimal.zero
+            ? (offsetAmount / longLoss).toDecimal(
+                  scaleOnInfinitePrecision: 12,
+                ) *
+                Decimal.fromInt(100)
+            : Decimal.zero;
     final currentPercent =
         markPrice == null ? null : _percentFromPrice(markPrice, center);
     final protectionStatus = _protectionStatus(
@@ -169,11 +188,13 @@ class RecoveryShortEngine {
       final entryPercent =
           recoveryStartPercent - recoveryMicroStepPercent * Decimal.fromInt(i);
       final entryPrice = _priceFromPercent(center, entryPercent);
-      final existing = await (db.select(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(id)))
-          .getSingleOrNull();
+      final existing =
+          await (db.select(db.recoveryShortLevels)
+            ..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
       if (existing == null) {
-        await db.into(db.recoveryShortLevels).insert(
+        await db
+            .into(db.recoveryShortLevels)
+            .insert(
               RecoveryShortLevelsCompanion.insert(
                 id: id,
                 strategyId: strategyId,
@@ -194,8 +215,7 @@ class RecoveryShortEngine {
         continue;
       }
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(id))).write(
         RecoveryShortLevelsCompanion(
           symbol: Value(strategy.symbol),
           entryPercent: Value(entryPercent.toString()),
@@ -207,15 +227,14 @@ class RecoveryShortEngine {
   }
 
   Future<RecoveryShortReconcileReport> recoverRunningStrategies() async {
-    final strategies = await (db.select(db.strategies)
-          ..where(
-            (tbl) =>
-                tbl.environment.equals(
-                  AutoSpotGridExecutionService.futuresGridEnvironment,
-                ) &
-                tbl.status.equals('running'),
-          ))
-        .get();
+    final strategies =
+        await (db.select(db.strategies)..where(
+          (tbl) =>
+              tbl.environment.equals(
+                AutoSpotGridExecutionService.futuresGridEnvironment,
+              ) &
+              tbl.status.equals('running'),
+        )).get();
     var report = RecoveryShortReconcileReport.empty();
     for (final strategy in strategies) {
       final enabled = await AppUiSettings.shortRecoverEnabledForSymbol(
@@ -227,6 +246,11 @@ class RecoveryShortEngine {
       }
       final next = await reconcileStrategy(strategy.id);
       report = report.merge(next);
+      final markPrice =
+          marketData.latestFuturesMarkPriceFor(strategy.symbol)?.markPrice;
+      if (markPrice != null && markPrice > Decimal.zero) {
+        await _prepareEntryOrders(strategy, markPrice);
+      }
     }
     if (report.scanned > 0) {
       _debugTrace(
@@ -246,10 +270,11 @@ class RecoveryShortEngine {
     }
     await ensureForStrategy(strategyId);
     await liveExecution.connectFuturesForSymbol(strategy.symbol);
-    final rows = await (db.select(db.recoveryShortLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))
-          ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]))
-        .get();
+    final rows =
+        await (db.select(db.recoveryShortLevels)
+              ..where((tbl) => tbl.strategyId.equals(strategyId))
+              ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]))
+            .get();
     var scanned = 0;
     var synced = 0;
     var recovered = 0;
@@ -258,14 +283,22 @@ class RecoveryShortEngine {
     var missingOrders = 0;
     final messages = <String>[];
     for (final row in rows) {
-      final shouldCheck = row.status == statusEnterSubmitting ||
+      final shouldCheck =
+          row.status == statusEnterSubmitting ||
           row.status == statusExitSubmitting ||
-          row.status == statusFailed;
+          row.status == statusFailed ||
+          (row.status == statusArmedExit &&
+              row.exitOrderId != null &&
+              row.exitOrderId!.trim().isNotEmpty);
       if (!shouldCheck) {
         continue;
       }
       scanned += 1;
-      final isExit = row.status == statusExitSubmitting ||
+      final isExit =
+          row.status == statusExitSubmitting ||
+          (row.status == statusArmedExit &&
+              row.exitOrderId != null &&
+              row.exitOrderId!.trim().isNotEmpty) ||
           (row.status == statusFailed &&
               (row.exitOrderId != null ||
                   (row.entryOrderId != null &&
@@ -274,8 +307,7 @@ class RecoveryShortEngine {
       if (orderId == null || orderId.trim().isEmpty) {
         if (row.status == statusFailed) {
           await (db.update(db.recoveryShortLevels)
-                ..where((tbl) => tbl.id.equals(row.id)))
-              .write(
+            ..where((tbl) => tbl.id.equals(row.id))).write(
             RecoveryShortLevelsCompanion(
               status: Value(isExit ? statusArmedExit : statusReadyToEnter),
               armedForEntry: Value(!isExit),
@@ -366,27 +398,28 @@ class RecoveryShortEngine {
       }
       final previous = _previousPrices[symbol];
       _previousPrices[symbol] = current;
-      if (previous == null || previous == current) {
+      if (previous != null && previous == current) {
         continue;
       }
-      final strategies = await (db.select(db.strategies)
-            ..where(
-              (tbl) =>
-                  tbl.symbol.equals(symbol) &
-                  tbl.environment.equals(
-                    AutoSpotGridExecutionService.futuresGridEnvironment,
-                  ) &
-                  tbl.status.equals('running'),
-            ))
-          .get();
+      final strategies =
+          await (db.select(db.strategies)..where(
+            (tbl) =>
+                tbl.symbol.equals(symbol) &
+                tbl.environment.equals(
+                  AutoSpotGridExecutionService.futuresGridEnvironment,
+                ) &
+                tbl.status.equals('running'),
+          )).get();
       for (final strategy in strategies) {
         if (!_processingStrategies.add(strategy.id)) {
           continue;
         }
         unawaited(
-          _processStrategy(strategy, previous, current).whenComplete(() {
-            _processingStrategies.remove(strategy.id);
-          }),
+          _processStrategy(strategy, previous ?? current, current).whenComplete(
+            () {
+              _processingStrategies.remove(strategy.id);
+            },
+          ),
         );
       }
     }
@@ -402,6 +435,7 @@ class RecoveryShortEngine {
       symbol: strategy.symbol,
     );
     if (!enabled) {
+      await _cancelPendingEntryOrders(strategy);
       return;
     }
     await ensureForStrategy(strategy.id);
@@ -410,11 +444,15 @@ class RecoveryShortEngine {
       return;
     }
     final config = await gridExecution.loadEditableConfig(strategy.id);
-    final tolerance = config?.longEntryTriggerDistanceUsdt ??
-        AutoSpotGridExecutionService.defaultLongEntryTriggerDistanceUsdt;
     final leverage = config?.futuresLeverage ?? 1;
     final exposure = await _longExposure(strategy.id, center);
     final partQty = _partQuantity(exposure);
+    await _prepareEntryOrders(
+      strategy,
+      currentPrice,
+      partQty: partQty,
+      leverage: leverage,
+    );
     final previousPercent = _percentFromPrice(previousPrice, center);
     final currentPercent = _percentFromPrice(currentPrice, center);
     if (previousPercent > recoveryStartPercent &&
@@ -427,30 +465,19 @@ class RecoveryShortEngine {
             'longQty=${exposure.totalLongQty} '
             'longAvgPrice=${exposure.longAvgPrice} '
             'longAvgPercent=${exposure.longAvgPercent} '
-            'targetPartQty=$partQty tolerance=$tolerance leverage=$leverage',
+            'targetPartQty=$partQty leverage=$leverage',
       );
     }
-    final rows = await (db.select(db.recoveryShortLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategy.id))
-          ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]))
-        .get();
+    final rows =
+        await (db.select(db.recoveryShortLevels)
+              ..where((tbl) => tbl.strategyId.equals(strategy.id))
+              ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]))
+            .get();
     for (final row in rows) {
       await _processLevel(
         strategy: strategy,
         row: row,
-        previousPrice: previousPrice,
-        currentPrice: currentPrice,
-        previousPercent: previousPercent,
         currentPercent: currentPercent,
-        targetPartQuantity: partQty,
-        tolerance: tolerance,
-        leverage: leverage,
-      );
-    }
-    if (currentPercent <= lowerBoundPercent) {
-      await _trimExcessShort(
-        strategy: strategy,
-        totalLongQty: exposure.totalLongQty,
         leverage: leverage,
       );
     }
@@ -459,39 +486,11 @@ class RecoveryShortEngine {
   Future<void> _processLevel({
     required Strategy strategy,
     required RecoveryShortLevel row,
-    required Decimal previousPrice,
-    required Decimal currentPrice,
-    required Decimal previousPercent,
     required Decimal currentPercent,
-    required Decimal targetPartQuantity,
-    required Decimal tolerance,
     required int leverage,
   }) async {
-    final entryPrice = _parseDecimal(row.entryPrice);
     final entryPercent = _parseDecimal(row.entryPercent);
-    final upperTriggerPrice = entryPrice + tolerance;
-    final lowerTriggerPrice = entryPrice - tolerance;
     final now = DateTime.now().toUtc();
-
-    if (row.status == statusReadyToEnter &&
-        row.armedForEntry &&
-        targetPartQuantity > Decimal.zero &&
-        previousPrice > upperTriggerPrice &&
-        currentPrice <= upperTriggerPrice &&
-        currentPrice >= lowerTriggerPrice) {
-      _debugTrace(
-        'RECOVERY_SHORT',
-        'entry trigger strategy=${strategy.id} symbol=${strategy.symbol} '
-            'part=${row.partIndex} prevPrice=$previousPrice '
-            'currentPrice=$currentPrice entryPrice=$entryPrice '
-            'lowerTrigger=$lowerTriggerPrice '
-            'upperTrigger=$upperTriggerPrice '
-            'prevPercent=$previousPercent currentPercent=$currentPercent '
-            'qty=$targetPartQuantity',
-      );
-      await _enterShort(strategy, row, targetPartQuantity, leverage);
-      return;
-    }
 
     if (row.status == statusOpen || row.status == statusArmedExit) {
       final lowest = _minNullable(
@@ -507,8 +506,7 @@ class RecoveryShortEngine {
               'entryPercent=$entryPercent lowest=$lowest',
         );
         await (db.update(db.recoveryShortLevels)
-              ..where((tbl) => tbl.id.equals(row.id)))
-            .write(
+          ..where((tbl) => tbl.id.equals(row.id))).write(
           RecoveryShortLevelsCompanion(
             status: const Value(statusArmedExit),
             armedForExit: const Value(true),
@@ -516,22 +514,7 @@ class RecoveryShortEngine {
             updatedAt: Value(now),
           ),
         );
-        return;
-      }
-      if (row.status == statusArmedExit &&
-          previousPrice < lowerTriggerPrice &&
-          currentPrice >= lowerTriggerPrice &&
-          currentPrice <= upperTriggerPrice) {
-        _debugTrace(
-          'RECOVERY_SHORT',
-          'exit trigger strategy=${strategy.id} symbol=${strategy.symbol} '
-              'part=${row.partIndex} prevPrice=$previousPrice '
-              'currentPrice=$currentPrice entryPrice=$entryPrice '
-              'lowerTrigger=$lowerTriggerPrice '
-              'upperTrigger=$upperTriggerPrice '
-              'qty=${row.remainingQuantity}',
-        );
-        await _exitShort(
+        await _ensureExitStopOrder(
           strategy,
           row,
           _parseDecimal(row.remainingQuantity),
@@ -539,9 +522,16 @@ class RecoveryShortEngine {
         );
         return;
       }
+      if (row.status == statusArmedExit) {
+        await _ensureExitStopOrder(
+          strategy,
+          row,
+          _parseDecimal(row.remainingQuantity),
+          leverage,
+        );
+      }
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
           lowestPercentSinceOpen: Value(lowest.toString()),
           updatedAt: Value(now),
@@ -560,8 +550,7 @@ class RecoveryShortEngine {
         updatedAt: Value(now),
       );
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(updates);
+        ..where((tbl) => tbl.id.equals(row.id))).write(updates);
       if (currentPercent >= entryPercent + recoveryMicroStepPercent) {
         _debugTrace(
           'RECOVERY_SHORT',
@@ -570,14 +559,117 @@ class RecoveryShortEngine {
               'entryPercent=$entryPercent highest=$highest',
         );
         await (db.update(db.recoveryShortLevels)
-              ..where((tbl) => tbl.id.equals(row.id)))
-            .write(
+          ..where((tbl) => tbl.id.equals(row.id))).write(
           RecoveryShortLevelsCompanion(
             status: const Value(statusReadyToEnter),
             armedForEntry: const Value(true),
             lastError: const Value(null),
             updatedAt: Value(DateTime.now().toUtc()),
           ),
+        );
+      }
+    }
+  }
+
+  Future<void> _ensureExitStopOrder(
+    Strategy strategy,
+    RecoveryShortLevel row,
+    Decimal quantity,
+    int leverage,
+  ) async {
+    if (quantity <= Decimal.zero) {
+      return;
+    }
+    final existingOrder = await _activeOrderForLevel(strategy.id, row);
+    if (existingOrder != null) {
+      return;
+    }
+    await _exitShort(strategy, row, quantity, leverage);
+  }
+
+  Future<void> _prepareEntryOrders(
+    Strategy strategy,
+    Decimal currentPrice, {
+    Decimal? partQty,
+    int? leverage,
+  }) async {
+    final center = Decimal.tryParse(strategy.centerPrice);
+    if (center == null || center <= Decimal.zero) {
+      return;
+    }
+    final exposure = await _longExposure(strategy.id, center);
+    final quantity = partQty ?? _partQuantity(exposure);
+    if (quantity <= Decimal.zero) {
+      return;
+    }
+    final config =
+        leverage == null
+            ? await gridExecution.loadEditableConfig(strategy.id)
+            : null;
+    final resolvedLeverage = leverage ?? config?.futuresLeverage ?? 1;
+    final rows =
+        await (db.select(db.recoveryShortLevels)
+              ..where(
+                (tbl) =>
+                    tbl.strategyId.equals(strategy.id) &
+                    tbl.status.equals(statusReadyToEnter) &
+                    tbl.armedForEntry.equals(true),
+              )
+              ..orderBy([(tbl) => OrderingTerm.asc(tbl.partIndex)]))
+            .get();
+    for (final row in rows) {
+      final entryPrice = _parseDecimal(row.entryPrice);
+      // A SELL stop below the current price is a pending trigger. If the
+      // market is already below this level, do not open late on a rebound.
+      if (entryPrice <= Decimal.zero || currentPrice <= entryPrice) {
+        continue;
+      }
+      await _enterShort(strategy, row, quantity, resolvedLeverage);
+    }
+  }
+
+  Future<void> _cancelPendingEntryOrders(Strategy strategy) async {
+    final rows =
+        await (db.select(db.recoveryShortLevels)..where(
+          (tbl) =>
+              tbl.strategyId.equals(strategy.id) &
+              tbl.status.equals(statusEnterSubmitting),
+        )).get();
+    for (final row in rows) {
+      final orderId = row.entryOrderId;
+      if (orderId == null || orderId.trim().isEmpty) {
+        continue;
+      }
+      final order = await _orderById(orderId);
+      if (order == null || !_isActiveOrderStatus(order.status)) {
+        continue;
+      }
+      try {
+        await liveExecution.cancelFuturesOrder(
+          order.clientOrderId,
+          symbol: strategy.symbol,
+        );
+        await (db.update(db.recoveryShortLevels)
+          ..where((tbl) => tbl.id.equals(row.id))).write(
+          RecoveryShortLevelsCompanion(
+            status: const Value(statusReadyToEnter),
+            armedForEntry: const Value(true),
+            lastError: const Value(null),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+        _debugTrace(
+          'RECOVERY_SHORT',
+          'cancel pending entry strategy=${strategy.id} '
+              'symbol=${strategy.symbol} part=${row.partIndex} '
+              'order=${order.id}',
+        );
+      } catch (error) {
+        _debugTrace(
+          'RECOVERY_SHORT',
+          'cancel pending entry failed strategy=${strategy.id} '
+              'symbol=${strategy.symbol} part=${row.partIndex} '
+              'order=${order.id} error=$error',
         );
       }
     }
@@ -602,8 +694,7 @@ class RecoveryShortEngine {
       return;
     }
     await (db.update(db.recoveryShortLevels)
-          ..where((tbl) => tbl.id.equals(row.id)))
-        .write(
+      ..where((tbl) => tbl.id.equals(row.id))).write(
       RecoveryShortLevelsCompanion(
         status: const Value(statusEnterSubmitting),
         quantity: Value(quantity.toString()),
@@ -617,26 +708,36 @@ class RecoveryShortEngine {
             'part=${row.partIndex} qty=$quantity leverage=$leverage',
       );
       await liveExecution.connectFuturesForSymbol(strategy.symbol);
-      final orderId = await liveExecution.placeHedgeFuturesMarketOrder(
+      final consumerKey = 'recoveryShort:${strategy.id}';
+      await liveExecution.startFuturesUserDataStream(
+        symbol: strategy.symbol,
+        consumerKey: consumerKey,
+      );
+      _userStreamConsumerKeys.add(consumerKey);
+      final entryPrice = _parseDecimal(row.entryPrice);
+      final submitQuantity = await _quantityWithinShortLimit(
+        symbol: strategy.symbol,
+        requestedQuantity: quantity,
+        referencePrice: entryPrice,
+      );
+      final orderId = await liveExecution.placeHedgeFuturesStopMarketOrder(
         strategyId: strategy.id,
         symbol: strategy.symbol,
         side: 'SELL',
-        quantity: quantity,
-        reduceOnly: false,
+        quantity: submitQuantity,
+        stopPrice: entryPrice,
         leverage: leverage.clamp(1, 125),
         source: source,
         purpose: entryPurpose,
       );
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
-          status: const Value(statusOpen),
-          quantity: Value(quantity.toString()),
-          remainingQuantity: Value(quantity.toString()),
+          status: const Value(statusEnterSubmitting),
+          quantity: Value(submitQuantity.toString()),
+          remainingQuantity: const Value('0'),
           armedForExit: const Value(false),
           armedForEntry: const Value(false),
-          lowestPercentSinceOpen: Value(row.entryPercent),
           entryOrderId: Value(orderId),
           lastError: const Value(null),
           updatedAt: Value(DateTime.now().toUtc()),
@@ -644,13 +745,13 @@ class RecoveryShortEngine {
       );
       _debugTrace(
         'RECOVERY_SHORT',
-        'entry submitted strategy=${strategy.id} symbol=${strategy.symbol} '
-            'part=${row.partIndex} orderId=$orderId qty=$quantity',
+        'entry stop submitted strategy=${strategy.id} symbol=${strategy.symbol} '
+            'part=${row.partIndex} orderId=$orderId stopPrice=$entryPrice '
+            'qty=$submitQuantity',
       );
     } catch (error) {
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
           status: const Value(statusFailed),
           lastError: Value(error.toString()),
@@ -663,6 +764,55 @@ class RecoveryShortEngine {
             'part=${row.partIndex} qty=$quantity error=$error',
       );
     }
+  }
+
+  Future<Decimal> _quantityWithinShortLimit({
+    required String symbol,
+    required Decimal requestedQuantity,
+    required Decimal referencePrice,
+  }) async {
+    if (referencePrice <= Decimal.zero) {
+      return requestedQuantity;
+    }
+
+    // Refresh before calculating the remaining account-level short budget.
+    // The execution service performs the same check again immediately before
+    // submitting, so this is a sizing guard rather than a replacement for
+    // the final risk check.
+    await liveExecution.refreshFuturesSnapshotForSymbol(
+      symbol,
+      includeHistory: false,
+    );
+    final shortLimit = await liveExecution.manualFuturesShortLimit(
+      symbol: symbol,
+    );
+    final currentShortQuantity = await liveExecution
+        .currentFuturesShortQuantity(symbol);
+    final pendingShortNotional = await liveExecution
+        .pendingFuturesShortNotional(symbol: symbol);
+    final currentShortNotional = currentShortQuantity * referencePrice;
+    final remainingNotional =
+        shortLimit - currentShortNotional - pendingShortNotional;
+    if (remainingNotional <= Decimal.zero) {
+      throw StateError(
+        'Recovery short notional limit exhausted: '
+        'current=$currentShortNotional limit=$shortLimit USDT',
+      );
+    }
+
+    final maxQuantity = (remainingNotional / referencePrice).toDecimal(
+      scaleOnInfinitePrecision: 18,
+    );
+    if (requestedQuantity <= maxQuantity) {
+      return requestedQuantity;
+    }
+    _debugTrace(
+      'RECOVERY_SHORT',
+      'cap entry quantity symbol=$symbol requested=$requestedQuantity '
+          'capped=$maxQuantity currentNotional=$currentShortNotional '
+          'pendingNotional=$pendingShortNotional limit=$shortLimit',
+    );
+    return maxQuantity;
   }
 
   Future<void> _exitShort(
@@ -686,8 +836,7 @@ class RecoveryShortEngine {
       return;
     }
     await (db.update(db.recoveryShortLevels)
-          ..where((tbl) => tbl.id.equals(row.id)))
-        .write(
+      ..where((tbl) => tbl.id.equals(row.id))).write(
       RecoveryShortLevelsCompanion(
         status: const Value(statusExitSubmitting),
         updatedAt: Value(DateTime.now().toUtc()),
@@ -696,46 +845,42 @@ class RecoveryShortEngine {
     try {
       _debugTrace(
         'RECOVERY_SHORT',
-        'submit exit BUY reduceOnly strategy=${strategy.id} '
+        'submit exit BUY STOP_MARKET reduceOnly strategy=${strategy.id} '
             'symbol=${strategy.symbol} part=${row.partIndex} qty=$quantity '
-            'leverage=$leverage',
+            'stopPrice=${row.entryPrice} leverage=$leverage',
       );
       await liveExecution.connectFuturesForSymbol(strategy.symbol);
-      final orderId = await liveExecution.placeHedgeFuturesMarketOrder(
+      final orderId = await liveExecution.placeHedgeFuturesStopMarketOrder(
         strategyId: strategy.id,
         symbol: strategy.symbol,
         side: 'BUY',
         quantity: quantity,
-        reduceOnly: true,
+        stopPrice: _parseDecimal(row.entryPrice),
         leverage: leverage.clamp(1, 125),
         source: source,
         purpose: exitPurpose,
       );
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
-          status: const Value(statusClosedWaitingRearm),
-          remainingQuantity: const Value('0'),
-          armedForExit: const Value(false),
+          status: const Value(statusArmedExit),
+          remainingQuantity: Value(quantity.toString()),
+          armedForExit: const Value(true),
           armedForEntry: const Value(false),
-          highestPercentSinceClose: Value(row.entryPercent),
           exitOrderId: Value(orderId),
-          roundId: Value(row.roundId + 1),
           lastError: const Value(null),
           updatedAt: Value(DateTime.now().toUtc()),
         ),
       );
       _debugTrace(
         'RECOVERY_SHORT',
-        'exit submitted strategy=${strategy.id} symbol=${strategy.symbol} '
+        'exit stop submitted strategy=${strategy.id} symbol=${strategy.symbol} '
             'part=${row.partIndex} orderId=$orderId qty=$quantity '
-            'nextRound=${row.roundId + 1}',
+            'stopPrice=${row.entryPrice}',
       );
     } catch (error) {
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
           status: const Value(statusFailed),
           lastError: Value(error.toString()),
@@ -750,102 +895,21 @@ class RecoveryShortEngine {
     }
   }
 
-  Future<void> _trimExcessShort({
-    required Strategy strategy,
-    required Decimal totalLongQty,
-    required int leverage,
-  }) async {
-    final rows = await (db.select(db.recoveryShortLevels)
-          ..where(
-            (tbl) =>
-                tbl.strategyId.equals(strategy.id) &
-                tbl.status.isIn([statusOpen, statusArmedExit]),
-          )
-          ..orderBy([(tbl) => OrderingTerm.desc(tbl.partIndex)]))
-        .get();
-    var totalShort = Decimal.zero;
-    for (final row in rows) {
-      totalShort += _parseDecimal(row.remainingQuantity);
-    }
-    var excess = totalShort - totalLongQty;
-    if (excess <= Decimal.zero) {
-      return;
-    }
-    _debugTrace(
-      'RECOVERY_SHORT',
-      'lower-bound trim start strategy=${strategy.id} '
-          'symbol=${strategy.symbol} totalShort=$totalShort '
-          'totalLong=$totalLongQty excess=$excess',
-    );
-    for (final row in rows) {
-      if (excess <= Decimal.zero) {
-        return;
-      }
-      final remaining = _parseDecimal(row.remainingQuantity);
-      if (remaining <= Decimal.zero) {
-        continue;
-      }
-      final closeQty = remaining < excess ? remaining : excess;
-      _debugTrace(
-        'RECOVERY_SHORT',
-        'lower-bound trim submit strategy=${strategy.id} '
-            'symbol=${strategy.symbol} part=${row.partIndex} '
-            'remaining=$remaining closeQty=$closeQty excessBefore=$excess',
-      );
-      await liveExecution.connectFuturesForSymbol(strategy.symbol);
-      await liveExecution.placeHedgeFuturesMarketOrder(
-        strategyId: strategy.id,
-        symbol: strategy.symbol,
-        side: 'BUY',
-        quantity: closeQty,
-        reduceOnly: true,
-        leverage: leverage.clamp(1, 125),
-        source: source,
-        purpose: 'recoveryShortLowerBoundTrim',
-      );
-      final nextRemaining = remaining - closeQty;
-      await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
-        RecoveryShortLevelsCompanion(
-          remainingQuantity: Value(nextRemaining.toString()),
-          status: Value(
-            nextRemaining > Decimal.zero
-                ? row.status
-                : statusClosedWaitingRearm,
-          ),
-          armedForEntry: Value(
-            nextRemaining <= Decimal.zero ? false : row.armedForEntry,
-          ),
-          updatedAt: Value(DateTime.now().toUtc()),
-        ),
-      );
-      excess -= closeQty;
-      _debugTrace(
-        'RECOVERY_SHORT',
-        'lower-bound trim done strategy=${strategy.id} '
-            'symbol=${strategy.symbol} part=${row.partIndex} '
-            'nextRemaining=$nextRemaining excessAfter=$excess',
-      );
-    }
-  }
-
   Future<_LongExposure> _longExposure(
     String strategyId,
     Decimal centerPrice,
   ) async {
-    final levels = await (db.select(db.gridLevels)
-          ..where(
-            (tbl) =>
-                tbl.strategyId.equals(strategyId) &
-                tbl.lifecycleStatus.isIn([
-                  'buyFilled',
-                  'sellSubmitting',
-                  'sellOpen',
-                  'sellPartiallyFilled',
-                ]),
-          ))
-        .get();
+    final levels =
+        await (db.select(db.gridLevels)..where(
+          (tbl) =>
+              tbl.strategyId.equals(strategyId) &
+              tbl.lifecycleStatus.isIn([
+                'buyFilled',
+                'sellSubmitting',
+                'sellOpen',
+                'sellPartiallyFilled',
+              ]),
+        )).get();
     Decimal totalQty = Decimal.zero;
     Decimal totalCost = Decimal.zero;
     for (final level in levels) {
@@ -853,15 +917,14 @@ class RecoveryShortEngine {
       if (orderId == null || orderId.trim().isEmpty) {
         continue;
       }
-      final order = await (db.select(db.orders)
-            ..where(
-              (tbl) =>
-                  tbl.id.equals(orderId) &
-                  tbl.source.equals(
-                    AutoSpotGridExecutionService.futuresLongSource,
-                  ),
-            ))
-          .getSingleOrNull();
+      final order =
+          await (db.select(db.orders)..where(
+            (tbl) =>
+                tbl.id.equals(orderId) &
+                tbl.source.equals(
+                  AutoSpotGridExecutionService.futuresLongSource,
+                ),
+          )).getSingleOrNull();
       if (order == null) {
         continue;
       }
@@ -890,17 +953,16 @@ class RecoveryShortEngine {
   }
 
   Future<_ShortExposure> _shortExposure(String strategyId) async {
-    final rows = await (db.select(db.recoveryShortLevels)
-          ..where(
-            (tbl) =>
-                tbl.strategyId.equals(strategyId) &
-                tbl.status.isIn([
-                  statusOpen,
-                  statusArmedExit,
-                  statusExitSubmitting,
-                ]),
-          ))
-        .get();
+    final rows =
+        await (db.select(db.recoveryShortLevels)..where(
+          (tbl) =>
+              tbl.strategyId.equals(strategyId) &
+              tbl.status.isIn([
+                statusOpen,
+                statusArmedExit,
+                statusExitSubmitting,
+              ]),
+        )).get();
     Decimal totalQty = Decimal.zero;
     Decimal totalCost = Decimal.zero;
     for (final row in rows) {
@@ -933,12 +995,18 @@ class RecoveryShortEngine {
     final now = DateTime.now().toUtc();
     if (status == 'filled' || executed > Decimal.zero) {
       if (isExit) {
-        final remaining = _parseDecimal(row.remainingQuantity);
+        final totalQuantity = _parseDecimal(row.quantity);
+        final recordedRemaining = _parseDecimal(row.remainingQuantity);
+        final originalQuantity =
+            totalQuantity > Decimal.zero
+                ? totalQuantity
+                : recordedRemaining + executed;
         final nextRemaining =
-            remaining > executed ? remaining - executed : Decimal.zero;
+            originalQuantity > executed
+                ? originalQuantity - executed
+                : Decimal.zero;
         await (db.update(db.recoveryShortLevels)
-              ..where((tbl) => tbl.id.equals(row.id)))
-            .write(
+          ..where((tbl) => tbl.id.equals(row.id))).write(
           RecoveryShortLevelsCompanion(
             status: Value(
               nextRemaining > Decimal.zero
@@ -971,8 +1039,7 @@ class RecoveryShortEngine {
       final nextQty =
           executed > Decimal.zero ? executed : _parseDecimal(row.quantity);
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
           status: const Value(statusOpen),
           quantity: Value(nextQty.toString()),
@@ -994,10 +1061,10 @@ class RecoveryShortEngine {
     }
     if (_isTerminalOrderStatus(status)) {
       await (db.update(db.recoveryShortLevels)
-            ..where((tbl) => tbl.id.equals(row.id)))
-          .write(
+        ..where((tbl) => tbl.id.equals(row.id))).write(
         RecoveryShortLevelsCompanion(
-          status: Value(isExit ? statusArmedExit : statusFailed),
+          status: Value(isExit ? statusArmedExit : statusReadyToEnter),
+          armedForEntry: Value(!isExit),
           armedForExit: Value(isExit),
           lastError: Value(
             'Recovery ${isExit ? 'exit' : 'entry'} order $status',
@@ -1016,20 +1083,19 @@ class RecoveryShortEngine {
   }
 
   Future<Order?> _orderById(String orderId) {
-    return (db.select(db.orders)..where((tbl) => tbl.id.equals(orderId)))
-        .getSingleOrNull();
+    return (db.select(db.orders)
+      ..where((tbl) => tbl.id.equals(orderId))).getSingleOrNull();
   }
 
   Future<Order?> _activeOrderForLevel(
     String strategyId,
     RecoveryShortLevel row,
   ) async {
-    final orders = await (db.select(db.orders)
-          ..where(
-            (tbl) =>
-                tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
-          ))
-        .get();
+    final orders =
+        await (db.select(db.orders)..where(
+          (tbl) =>
+              tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
+        )).get();
     for (final order in orders) {
       final belongsToLevel =
           order.id == row.entryOrderId || order.id == row.exitOrderId;
@@ -1046,8 +1112,7 @@ class RecoveryShortEngine {
   ) async {
     final isExit = order.purpose == exitPurpose || order.reduceOnly;
     await (db.update(db.recoveryShortLevels)
-          ..where((tbl) => tbl.id.equals(row.id)))
-        .write(
+      ..where((tbl) => tbl.id.equals(row.id))).write(
       RecoveryShortLevelsCompanion(
         status: Value(isExit ? statusExitSubmitting : statusEnterSubmitting),
         entryOrderId: isExit ? const Value.absent() : Value(order.id),
@@ -1089,7 +1154,8 @@ class RecoveryShortEngine {
     if (denominator <= Decimal.zero || numerator <= Decimal.zero) {
       return Decimal.zero;
     }
-    final totalShort = exposure.totalLongQty *
+    final totalShort =
+        exposure.totalLongQty *
         (numerator / denominator).toDecimal(scaleOnInfinitePrecision: 18);
     return (totalShort / Decimal.fromInt(recoveryParts)).toDecimal(
       scaleOnInfinitePrecision: 18,
@@ -1097,8 +1163,8 @@ class RecoveryShortEngine {
   }
 
   Future<Strategy?> _strategy(String strategyId) {
-    return (db.select(db.strategies)..where((tbl) => tbl.id.equals(strategyId)))
-        .getSingleOrNull();
+    return (db.select(db.strategies)
+      ..where((tbl) => tbl.id.equals(strategyId))).getSingleOrNull();
   }
 
   String _levelId(String strategyId, int partIndex) =>
@@ -1224,7 +1290,8 @@ class RecoveryShortReconcileReport {
   final int missingOrders;
   final List<String> messages;
 
-  String get summary => '扫描 $scanned，单笔同步 $synced，恢复 $recovered，'
+  String get summary =>
+      '扫描 $scanned，单笔同步 $synced，恢复 $recovered，'
       '仍提交中 $pending，失败 $failed，缺订单 $missingOrders';
 
   RecoveryShortReconcileReport merge(RecoveryShortReconcileReport other) {
@@ -1280,9 +1347,9 @@ class _LongExposure {
   });
 
   _LongExposure.zero()
-      : totalLongQty = Decimal.zero,
-        longAvgPrice = Decimal.zero,
-        longAvgPercent = Decimal.zero;
+    : totalLongQty = Decimal.zero,
+      longAvgPrice = Decimal.zero,
+      longAvgPercent = Decimal.zero;
 
   final Decimal totalLongQty;
   final Decimal longAvgPrice;
@@ -1296,8 +1363,8 @@ class _ShortExposure {
   });
 
   _ShortExposure.zero()
-      : totalShortQty = Decimal.zero,
-        shortAvgPrice = Decimal.zero;
+    : totalShortQty = Decimal.zero,
+      shortAvgPrice = Decimal.zero;
 
   final Decimal totalShortQty;
   final Decimal shortAvgPrice;

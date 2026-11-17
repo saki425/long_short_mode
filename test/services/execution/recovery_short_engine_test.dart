@@ -89,33 +89,15 @@ void main() {
     await db.close();
   });
 
-  test('opens short only on downward entry into trigger range', () async {
-    await _emitMark(futuresController, '97');
-    await _emitMark(futuresController, '96');
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-
-    expect(liveExecution.orders, isEmpty);
-
+  test('prepares stop entries before the downward move', () async {
     await _emitMark(futuresController, '99');
-    await _emitMark(futuresController, '95.5');
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await _waitFor(() => liveExecution.orders.length == 10);
 
-    expect(liveExecution.orders, isEmpty);
-
-    await _emitMark(futuresController, '95.5');
-    await _emitMark(futuresController, '96.8');
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-
-    expect(liveExecution.orders, isEmpty);
-
-    await _emitMark(futuresController, '99');
-    await _emitMark(futuresController, '98.45');
-
-    await _waitFor(() => liveExecution.orders.length == 1);
-    expect(liveExecution.orders.single.side, 'SELL');
-    expect(liveExecution.orders.single.reduceOnly, isFalse);
+    expect(liveExecution.orders.every((order) => order.side == 'SELL'), isTrue);
+    expect(liveExecution.orders.every((order) => !order.reduceOnly), isTrue);
     final level = await _level(db, strategyId, 0);
-    expect(level.status, RecoveryShortEngine.statusOpen);
+    expect(level.status, RecoveryShortEngine.statusEnterSubmitting);
+    expect(level.remainingQuantity, '0');
   });
 
   test('does not execute while short recovery is disabled', () async {
@@ -136,7 +118,13 @@ void main() {
   });
 
   test('requires another 0.1 percent drop before exit is armed', () async {
-    await _openFirstLevel(futuresController, liveExecution);
+    await _openFirstLevel(
+      futuresController,
+      liveExecution,
+      db,
+      engine,
+      strategyId,
+    );
 
     await _emitMark(futuresController, '97.45');
     await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -153,32 +141,49 @@ void main() {
     );
   });
 
-  test(
-    'closes short when price rebounds near entry after being armed',
-    () async {
-      await _openFirstLevel(futuresController, liveExecution);
-      await _emitMark(futuresController, '97.3');
-      await _waitFor(
-        () async =>
-            (await _level(db, strategyId, 0)).status ==
-            RecoveryShortEngine.statusArmedExit,
-      );
+  test('keeps exit stop at entry price while market is below entry', () async {
+    await _openFirstLevel(
+      futuresController,
+      liveExecution,
+      db,
+      engine,
+      strategyId,
+    );
+    await _emitMark(futuresController, '97.3');
+    await _waitFor(
+      () async =>
+          (await _level(db, strategyId, 0)).status ==
+          RecoveryShortEngine.statusArmedExit,
+    );
 
-      await _emitMark(futuresController, '96.4');
-      await _emitMark(futuresController, '96.6');
+    await _emitMark(futuresController, '96.4');
+    await _emitMark(futuresController, '96.6');
+    await Future<void>.delayed(const Duration(milliseconds: 80));
 
-      await _waitFor(
-        () async =>
-            (await _level(db, strategyId, 0)).status ==
-            RecoveryShortEngine.statusClosedWaitingRearm,
-      );
-      expect(liveExecution.orders.last.side, 'BUY');
-      expect(liveExecution.orders.last.reduceOnly, isTrue);
-      final level = await _level(db, strategyId, 0);
-      expect(level.status, RecoveryShortEngine.statusClosedWaitingRearm);
-      expect(level.remainingQuantity, '0');
-    },
-  );
+    var level = await _level(db, strategyId, 0);
+    expect(level.status, RecoveryShortEngine.statusArmedExit);
+    expect(level.exitOrderId, isNotNull);
+    final exitOrder =
+        await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(level.exitOrderId!))).getSingle();
+    expect(exitOrder.side, 'BUY');
+    expect(exitOrder.orderType, 'STOP_MARKET');
+    expect(exitOrder.price, level.entryPrice);
+    expect(exitOrder.reduceOnly, isTrue);
+
+    await _fillExitOrder(db, engine, liveExecution, strategyId);
+
+    await _waitFor(
+      () async =>
+          (await _level(db, strategyId, 0)).status ==
+          RecoveryShortEngine.statusClosedWaitingRearm,
+    );
+    expect(liveExecution.orders.last.side, 'BUY');
+    expect(liveExecution.orders.last.reduceOnly, isTrue);
+    level = await _level(db, strategyId, 0);
+    expect(level.status, RecoveryShortEngine.statusClosedWaitingRearm);
+    expect(level.remainingQuantity, '0');
+  });
 
   test(
     'requires a 0.1 percent rebound before re-entering is allowed',
@@ -187,6 +192,7 @@ void main() {
         futuresController,
         liveExecution,
         db,
+        engine,
         strategyId,
       );
 
@@ -217,23 +223,42 @@ void main() {
       final first = await _level(db, strategyId, 0);
       final second = await _level(db, strategyId, 1);
       return first.status == RecoveryShortEngine.statusFailed &&
-          second.status == RecoveryShortEngine.statusOpen;
+          second.status == RecoveryShortEngine.statusEnterSubmitting;
     });
 
     final first = await _level(db, strategyId, 0);
     final second = await _level(db, strategyId, 1);
     expect(first.lastError, contains('planned SELL failure'));
     expect(second.entryOrderId, isNotNull);
-    expect(liveExecution.orders, hasLength(1));
-    expect(liveExecution.orders.single.side, 'SELL');
+    expect(liveExecution.orders, hasLength(9));
+    expect(liveExecution.orders.every((order) => order.side == 'SELL'), isTrue);
+  });
+
+  test('caps entry quantity by the remaining short notional limit', () async {
+    liveExecution.shortLimit = Decimal.fromInt(350);
+    liveExecution.currentShortQuantity = Decimal.parse('3');
+
+    await _emitMark(futuresController, '99');
+    await _emitMark(futuresController, '98.45');
+    await _waitFor(() => liveExecution.orders.isNotEmpty);
+
+    final order = liveExecution.orders.first;
+    final currentMark = Decimal.parse('97.5');
+    final remainingNotional =
+        Decimal.fromInt(350) - currentMark * Decimal.fromInt(3);
+    expect(order.side, 'SELL');
+    expect(order.quantity * currentMark, lessThanOrEqualTo(remainingNotional));
+    expect(
+      (await _level(db, strategyId, 0)).quantity,
+      order.quantity.toString(),
+    );
   });
 
   test('light reconcile rearms entry that failed before submission', () async {
     await engine.ensureForStrategy(strategyId);
     final level = await _level(db, strategyId, 0);
     await (db.update(db.recoveryShortLevels)
-          ..where((tbl) => tbl.id.equals(level.id)))
-        .write(
+      ..where((tbl) => tbl.id.equals(level.id))).write(
       const RecoveryShortLevelsCompanion(
         status: Value(RecoveryShortEngine.statusFailed),
         armedForEntry: Value(true),
@@ -269,8 +294,7 @@ void main() {
     );
     final level = await _level(db, strategyId, 0);
     await (db.update(db.recoveryShortLevels)
-          ..where((tbl) => tbl.id.equals(level.id)))
-        .write(
+      ..where((tbl) => tbl.id.equals(level.id))).write(
       const RecoveryShortLevelsCompanion(
         status: Value(RecoveryShortEngine.statusEnterSubmitting),
         quantity: Value('1.25'),
@@ -304,8 +328,7 @@ void main() {
     );
     final level = await _level(db, strategyId, 0);
     await (db.update(db.recoveryShortLevels)
-          ..where((tbl) => tbl.id.equals(level.id)))
-        .write(
+      ..where((tbl) => tbl.id.equals(level.id))).write(
       const RecoveryShortLevelsCompanion(
         status: Value(RecoveryShortEngine.statusExitSubmitting),
         quantity: Value('1.25'),
@@ -340,19 +363,16 @@ void main() {
       status: 'new',
       now: DateTime.now().toUtc(),
     );
-    await (db.update(db.recoveryShortLevels)
-          ..where(
-            (tbl) => tbl.id.equals(level.id),
-          ))
-        .write(
-            const RecoveryShortLevelsCompanion(entryOrderId: Value(orderId)));
+    await (db.update(db.recoveryShortLevels)..where(
+      (tbl) => tbl.id.equals(level.id),
+    )).write(const RecoveryShortLevelsCompanion(entryOrderId: Value(orderId)));
 
     await _emitMark(futuresController, '99');
     await _emitMark(futuresController, '98.45');
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
     final updated = await _level(db, strategyId, 0);
-    expect(liveExecution.orders, isEmpty);
+    expect(liveExecution.orders, isNotEmpty);
     expect(updated.status, RecoveryShortEngine.statusEnterSubmitting);
     expect(updated.entryOrderId, orderId);
     expect(updated.lastError, contains('禁止重复提交'));
@@ -362,7 +382,9 @@ void main() {
 Future<String> _insertRunningLongStrategyWithExposure(AppDatabase db) async {
   final now = DateTime.utc(2026, 9, 17);
   const strategyId = 'recovery_strategy_1';
-  await db.into(db.strategies).insert(
+  await db
+      .into(db.strategies)
+      .insert(
         StrategiesCompanion.insert(
           id: strategyId,
           name: 'BTCUSDT LIVE Futures Long Grid',
@@ -386,7 +408,9 @@ Future<String> _insertRunningLongStrategyWithExposure(AppDatabase db) async {
           updatedAt: now,
         ),
       );
-  await db.into(db.gridLevels).insert(
+  await db
+      .into(db.gridLevels)
+      .insert(
         GridLevelsCompanion.insert(
           id: 'long_level_1',
           strategyId: strategyId,
@@ -404,7 +428,9 @@ Future<String> _insertRunningLongStrategyWithExposure(AppDatabase db) async {
           updatedAt: now,
         ),
       );
-  await db.into(db.orders).insert(
+  await db
+      .into(db.orders)
+      .insert(
         OrdersCompanion.insert(
           id: 'long_buy_order_1',
           strategyId: strategyId,
@@ -436,19 +462,55 @@ Future<String> _insertRunningLongStrategyWithExposure(AppDatabase db) async {
 Future<void> _openFirstLevel(
   StreamController<dynamic> futuresController,
   _RecoveryTestLiveExecution liveExecution,
+  AppDatabase db,
+  RecoveryShortEngine engine,
+  String strategyId,
 ) async {
   await _emitMark(futuresController, '99');
   await _emitMark(futuresController, '98.45');
-  await _waitFor(() => liveExecution.orders.length == 1);
+  await _waitFor(() => liveExecution.orders.isNotEmpty);
+  final level = await _level(db, strategyId, 0);
+  final orderId = level.entryOrderId;
+  if (orderId == null) {
+    fail('Recovery level 0 did not receive a stop order');
+  }
+  final order =
+      await (db.select(db.orders)
+        ..where((tbl) => tbl.id.equals(orderId))).getSingle();
+  final quantity = Decimal.tryParse(order.originalQuantity) ?? Decimal.zero;
+  final now = DateTime.now().toUtc();
+  await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id))).write(
+    OrdersCompanion(
+      status: const Value('filled'),
+      executedQuantity: Value(order.originalQuantity),
+      averagePrice: Value(order.price ?? '97.5'),
+      updatedAt: Value(now),
+      completedAt: Value(now),
+    ),
+  );
+  liveExecution.currentShortQuantity += quantity;
+  await engine.reconcileStrategy(strategyId);
+  await _waitFor(
+    () async =>
+        (await _level(db, strategyId, 0)).status ==
+        RecoveryShortEngine.statusOpen,
+  );
 }
 
 Future<void> _openAndCloseFirstLevel(
   StreamController<dynamic> futuresController,
   _RecoveryTestLiveExecution liveExecution,
   AppDatabase db,
+  RecoveryShortEngine engine,
   String strategyId,
 ) async {
-  await _openFirstLevel(futuresController, liveExecution);
+  await _openFirstLevel(
+    futuresController,
+    liveExecution,
+    db,
+    engine,
+    strategyId,
+  );
   await _emitMark(futuresController, '97.3');
   await _waitFor(
     () async =>
@@ -457,6 +519,7 @@ Future<void> _openAndCloseFirstLevel(
   );
   await _emitMark(futuresController, '96.4');
   await _emitMark(futuresController, '96.6');
+  await _fillExitOrder(db, engine, liveExecution, strategyId);
   await _waitFor(
     () async =>
         (await _level(db, strategyId, 0)).status ==
@@ -464,14 +527,47 @@ Future<void> _openAndCloseFirstLevel(
   );
 }
 
+Future<void> _fillExitOrder(
+  AppDatabase db,
+  RecoveryShortEngine engine,
+  _RecoveryTestLiveExecution liveExecution,
+  String strategyId,
+) async {
+  final level = await _level(db, strategyId, 0);
+  final orderId = level.exitOrderId;
+  if (orderId == null) {
+    fail('Recovery level 0 did not receive an exit stop order');
+  }
+  final order =
+      await (db.select(db.orders)
+        ..where((tbl) => tbl.id.equals(orderId))).getSingle();
+  final quantity = Decimal.tryParse(order.originalQuantity) ?? Decimal.zero;
+  final now = DateTime.now().toUtc();
+  await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id))).write(
+    OrdersCompanion(
+      status: const Value('filled'),
+      executedQuantity: Value(order.originalQuantity),
+      averagePrice: Value(level.entryPrice),
+      updatedAt: Value(now),
+      completedAt: Value(now),
+    ),
+  );
+  liveExecution.currentShortQuantity =
+      liveExecution.currentShortQuantity > quantity
+          ? liveExecution.currentShortQuantity - quantity
+          : Decimal.zero;
+  await engine.reconcileStrategy(strategyId);
+}
+
 Future<RecoveryShortLevel> _level(
   AppDatabase db,
   String strategyId,
   int partIndex,
 ) {
-  final query = db.select(db.recoveryShortLevels)
-    ..where((tbl) => tbl.strategyId.equals(strategyId))
-    ..where((tbl) => tbl.partIndex.equals(partIndex));
+  final query =
+      db.select(db.recoveryShortLevels)
+        ..where((tbl) => tbl.strategyId.equals(strategyId))
+        ..where((tbl) => tbl.partIndex.equals(partIndex));
   return query.getSingle();
 }
 
@@ -485,7 +581,9 @@ Future<void> _insertRecoveryOrder({
   required String status,
   required DateTime now,
 }) async {
-  await db.into(db.orders).insert(
+  await db
+      .into(db.orders)
+      .insert(
         OrdersCompanion.insert(
           id: id,
           strategyId: strategyId,
@@ -504,9 +602,10 @@ Future<void> _insertRecoveryOrder({
           averagePrice: const Value('97.5'),
           reduceOnly: Value(reduceOnly),
           status: status,
-          purpose: side == 'SELL'
-              ? RecoveryShortEngine.entryPurpose
-              : RecoveryShortEngine.exitPurpose,
+          purpose:
+              side == 'SELL'
+                  ? RecoveryShortEngine.entryPurpose
+                  : RecoveryShortEngine.exitPurpose,
           createdAt: now,
           submittedAt: Value(now),
           updatedAt: now,
@@ -547,15 +646,65 @@ class _RecoveryTestLiveExecution extends LiveExchangeExecutionService {
     required super.credentialsVault,
     required super.marketDataCoordinator,
     required super.liveTradingGateService,
-  })  : database = database,
-        super(db: database);
+  }) : database = database,
+       super(db: database);
 
   final AppDatabase database;
   final List<_PlacedRecoveryOrder> orders = [];
   int failNextSellCount = 0;
+  Decimal shortLimit = Decimal.fromInt(100000);
+  Decimal currentShortQuantity = Decimal.zero;
 
   @override
   Future<void> connectFuturesForSymbol(String symbol) async {}
+
+  @override
+  Future<void> startFuturesUserDataStream({
+    required String symbol,
+    String consumerKey = 'default',
+  }) async {}
+
+  @override
+  Future<void> stopFuturesUserDataStream({String? consumerKey}) async {}
+
+  @override
+  Future<void> refreshFuturesSnapshotForSymbol(
+    String symbol, {
+    bool includeHistory = true,
+  }) async {}
+
+  @override
+  Future<Decimal> manualFuturesShortLimit({String? symbol}) async {
+    return shortLimit;
+  }
+
+  @override
+  Future<Decimal> currentFuturesShortQuantity(
+    String symbol, {
+    String? keyProfileId,
+  }) async {
+    return currentShortQuantity;
+  }
+
+  @override
+  Future<Decimal> pendingFuturesShortNotional({String? symbol}) async {
+    final rows =
+        await (database.select(database.orders)
+              ..where((tbl) => tbl.source.equals(RecoveryShortEngine.source))
+              ..where((tbl) => tbl.side.equals('SELL'))
+              ..where((tbl) => tbl.reduceOnly.equals(false))
+              ..where((tbl) => tbl.status.isIn(['new', 'submitting', 'open'])))
+            .get();
+    var total = Decimal.zero;
+    for (final row in rows) {
+      final qty = Decimal.tryParse(row.originalQuantity) ?? Decimal.zero;
+      final executed = Decimal.tryParse(row.executedQuantity) ?? Decimal.zero;
+      final price = Decimal.tryParse(row.price ?? '') ?? Decimal.zero;
+      final remaining = qty > executed ? qty - executed : Decimal.zero;
+      total += remaining * price;
+    }
+    return total;
+  }
 
   @override
   Future<bool> syncFuturesOrderFromBinance(Order order) async {
@@ -580,7 +729,9 @@ class _RecoveryTestLiveExecution extends LiveExchangeExecutionService {
     }
     final id = 'recovery_order_${orders.length + 1}';
     final now = DateTime.now().toUtc();
-    await database.into(database.orders).insert(
+    await database
+        .into(database.orders)
+        .insert(
           OrdersCompanion.insert(
             id: id,
             strategyId: strategyId,
@@ -612,6 +763,72 @@ class _RecoveryTestLiveExecution extends LiveExchangeExecutionService {
         side: side,
         quantity: quantity,
         reduceOnly: reduceOnly,
+        source: source,
+        purpose: purpose,
+      ),
+    );
+    if (side == 'SELL' && !reduceOnly) {
+      currentShortQuantity += quantity;
+    } else if (side == 'BUY' && reduceOnly) {
+      currentShortQuantity =
+          currentShortQuantity > quantity
+              ? currentShortQuantity - quantity
+              : Decimal.zero;
+    }
+    return id;
+  }
+
+  @override
+  Future<String> placeHedgeFuturesStopMarketOrder({
+    required String strategyId,
+    required String side,
+    required Decimal quantity,
+    required Decimal stopPrice,
+    String symbol = 'BTCUSDT',
+    int leverage = 1,
+    String source = 'autoHedge',
+    String? purpose,
+    String? gridLevelId,
+  }) async {
+    if (side == 'SELL' && failNextSellCount > 0) {
+      failNextSellCount -= 1;
+      throw StateError('planned SELL failure');
+    }
+    final id = 'recovery_order_${orders.length + 1}';
+    final now = DateTime.now().toUtc();
+    await database
+        .into(database.orders)
+        .insert(
+          OrdersCompanion.insert(
+            id: id,
+            strategyId: strategyId,
+            environment: const Value('live'),
+            source: Value(source),
+            accountType: 'futuresSubAccount',
+            marketType: 'usdtFutures',
+            symbol: symbol,
+            clientOrderId: 'GH_RECOVERY_${orders.length + 1}',
+            side: side,
+            positionSide: const Value('SHORT'),
+            orderType: 'STOP_MARKET',
+            price: Value(stopPrice.toString()),
+            originalQuantity: quantity.toString(),
+            executedQuantity: const Value('0'),
+            averagePrice: const Value('0'),
+            reduceOnly: Value(side == 'BUY'),
+            status: 'new',
+            purpose: purpose ?? RecoveryShortEngine.entryPurpose,
+            createdAt: now,
+            submittedAt: Value(now),
+            updatedAt: now,
+          ),
+        );
+    orders.add(
+      _PlacedRecoveryOrder(
+        id: id,
+        side: side,
+        quantity: quantity,
+        reduceOnly: side == 'BUY',
         source: source,
         purpose: purpose,
       ),

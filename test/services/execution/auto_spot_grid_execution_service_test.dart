@@ -59,9 +59,9 @@ void main() {
     () async {
       final strategyId = await service.createDefaultStrategy();
 
-      final strategy =
-          await (db.select(db.strategies)
-            ..where((tbl) => tbl.id.equals(strategyId))).getSingle();
+      final strategy = await (db.select(db.strategies)
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .getSingle();
       final levels = await service.watchGridLevels(strategyId).first;
       final orders = await db.select(db.orders).get();
 
@@ -78,9 +78,9 @@ void main() {
     () async {
       final strategyId = await service.createDefaultStrategy();
 
-      final strategy =
-          await (db.select(db.strategies)
-            ..where((tbl) => tbl.id.equals(strategyId))).getSingle();
+      final strategy = await (db.select(db.strategies)
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .getSingle();
       final levels = await service.watchGridLevels(strategyId).first;
 
       expect(strategy.gridCount, 6);
@@ -98,6 +98,41 @@ void main() {
       final pairs =
           levels.map((level) => '${level.buyPrice}:${level.sellPrice}').toSet();
       expect(pairs, hasLength(levels.length));
+    },
+  );
+
+  test(
+    'persists futures LONG trigger mode and prehang settings per strategy',
+    () async {
+      final strategyId = await service.createDefaultStrategy(
+        executionMode: LiveSpotGridEditableConfig.futuresGridHedge,
+      );
+
+      await service.updateFuturesLongTriggerSettings(
+        strategyId,
+        triggerMode: LiveSpotGridEditableConfig.longEntryTriggerModePrehang,
+        triggerDistanceUsdt: Decimal.fromInt(7),
+        prehangLevels: 3,
+        maxOpenOrders: 5,
+      );
+
+      final loaded = await service.loadEditableConfig(strategyId);
+      expect(loaded != null, isTrue);
+      expect(
+        loaded!.longEntryTriggerMode,
+        LiveSpotGridEditableConfig.longEntryTriggerModePrehang,
+      );
+      expect(loaded.longEntryTriggerDistanceUsdt, Decimal.fromInt(7));
+      expect(loaded.longEntryPrehangLevels, 3);
+      expect(loaded.maxOpenOrders, 5);
+
+      final setting = await (db.select(db.appSettings)
+            ..where(
+              (tbl) => tbl.key.equals('live_spot_grid_config_$strategyId'),
+            ))
+          .getSingle();
+      expect(setting.value, contains('longEntryTriggerMode'));
+      expect(setting.value, contains('longEntryPrehangLevels'));
     },
   );
 
@@ -162,12 +197,13 @@ void main() {
         executionMode: LiveSpotGridEditableConfig.futuresGridHedge,
       );
       final level = (await service.watchGridLevels(strategyId).first).first;
-      final existingRow =
-          await (db.select(db.futureGridOrders)
-            ..where((tbl) => tbl.spotGridOrderId.equals(level.id))).getSingle();
+      final existingRow = await (db.select(db.futureGridOrders)
+            ..where((tbl) => tbl.spotGridOrderId.equals(level.id)))
+          .getSingle();
       final now = DateTime.utc(2026, 8, 16, 14);
       await (db.update(db.futureGridOrders)
-        ..where((tbl) => tbl.id.equals(existingRow.id))).write(
+            ..where((tbl) => tbl.id.equals(existingRow.id)))
+          .write(
         FutureGridOrdersCompanion(
           quantity: const Value('0.02'),
           status: const Value('WAIT_OPEN'),
@@ -212,9 +248,9 @@ void main() {
         refreshFirst: false,
       );
 
-      var row =
-          await (db.select(db.futureGridOrders)
-            ..where((tbl) => tbl.id.equals(existingRow.id))).getSingle();
+      var row = await (db.select(db.futureGridOrders)
+            ..where((tbl) => tbl.id.equals(existingRow.id)))
+          .getSingle();
       expect(row.status, 'OPEN');
       expect(row.quantity, '0.02');
 
@@ -252,7 +288,8 @@ void main() {
         updatedAt: now.add(const Duration(seconds: 3)),
       );
       await (db.update(db.futureGridOrders)
-        ..where((tbl) => tbl.id.equals(existingRow.id))).write(
+            ..where((tbl) => tbl.id.equals(existingRow.id)))
+          .write(
         FutureGridOrdersCompanion(
           status: const Value('CLOSING'),
           futuresOrderId: const Value('short_close_1'),
@@ -265,9 +302,9 @@ void main() {
         refreshFirst: false,
       );
 
-      row =
-          await (db.select(db.futureGridOrders)
-            ..where((tbl) => tbl.id.equals(existingRow.id))).getSingle();
+      row = await (db.select(db.futureGridOrders)
+            ..where((tbl) => tbl.id.equals(existingRow.id)))
+          .getSingle();
       expect(row.status, 'CLOSED');
       expect(row.quantity, '0');
     },
@@ -320,9 +357,9 @@ void main() {
 
       await service.refreshGridLifecycle(strategyId);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'sellOpen');
       expect(refreshed.activeOrderId, 'sell_1');
       expect(refreshed.lastBuyOrderId, 'buy_1');
@@ -378,9 +415,9 @@ void main() {
 
       await service.refreshGridLifecycle(strategyId);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'buyOpen');
       expect(refreshed.activeOrderId, 'buy_2');
       expect(refreshed.lastCompletedOrderId, 'sell_1');
@@ -492,9 +529,9 @@ void main() {
         validateMissingOpenOrders: false,
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'buyOpen');
       expect(refreshed.activeOrderId, 'futures_buy_2');
       expect(refreshed.linkedOrderId, 'futures_buy_2');
@@ -559,9 +596,9 @@ void main() {
         validateMissingOpenOrders: false,
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'waitingBuy');
       expect(refreshed.status, 'waitingBuy');
       expect(refreshed.linkedOrderId, equals(null));
@@ -598,7 +635,8 @@ void main() {
         reduceOnly: true,
       );
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals('released_sell_1'))).write(
+            ..where((tbl) => tbl.id.equals('released_sell_1')))
+          .write(
         const OrdersCompanion(
           errorMessage: Value('Binance 当前挂单和历史订单均无有效活动状态，已释放本地网格。'),
         ),
@@ -612,9 +650,9 @@ void main() {
 
       expect(report.errorOrders, 0);
       expect(report.errorDetails, isEmpty);
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'waitingBuy');
       expect(refreshed.activeOrderId, equals(null));
       expect(refreshed.lastSellOrderId, equals(null));
@@ -666,15 +704,16 @@ void main() {
         reduceOnly: true,
       );
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals('failed_zero_fill_long_close'))).write(
+            ..where((tbl) => tbl.id.equals('failed_zero_fill_long_close')))
+          .write(
         const OrdersCompanion(
           errorMessage: Value(
             'BinanceRequestException(statusCode: 400, code: -2022, message: ReduceOnly Order is rejected.)',
           ),
         ),
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -692,9 +731,9 @@ void main() {
         validateMissingOpenOrders: false,
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(report.errorOrders, 0);
       expect(report.errorDetails, isEmpty);
       expect(refreshed.lifecycleStatus, 'buyFilled');
@@ -750,9 +789,7 @@ void main() {
         positionSide: 'LONG',
         reduceOnly: true,
       );
-      await db
-          .into(db.exchangeOpenOrders)
-          .insert(
+      await db.into(db.exchangeOpenOrders).insert(
             ExchangeOpenOrdersCompanion.insert(
               id: 'occupied_reduce_only_sell',
               accountType: 'futuresSubAccount',
@@ -774,8 +811,8 @@ void main() {
               syncedAt: now,
             ),
           );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -798,9 +835,9 @@ void main() {
         ),
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
       expect(liveExecution.futuresLimitOrderAttempts, 0);
       expect(refreshed.lifecycleStatus, 'buyFilled');
       expect(refreshed.status, 'buyFilled');
@@ -834,13 +871,14 @@ void main() {
         positionSide: 'LONG',
       );
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals('stale_released_buy_1'))).write(
+            ..where((tbl) => tbl.id.equals('stale_released_buy_1')))
+          .write(
         const OrdersCompanion(
           errorMessage: Value('Binance 当前挂单和历史订单均无有效活动状态，已释放本地网格。'),
         ),
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -873,13 +911,13 @@ void main() {
         validateMissingOpenOrders: false,
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final order =
-          await (db.select(
-            db.orders,
-          )..where((tbl) => tbl.id.equals('stale_released_buy_1'))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final order = await (db.select(
+        db.orders,
+      )..where((tbl) => tbl.id.equals('stale_released_buy_1')))
+          .getSingle();
       expect(order.status, 'filled');
       expect(order.errorMessage, equals(null));
       expect(refreshed.lifecycleStatus, 'buyFilled');
@@ -912,8 +950,8 @@ void main() {
         purpose: 'futuresLongGridBuy',
         positionSide: 'LONG',
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -947,13 +985,14 @@ void main() {
         validateMissingOpenOrders: false,
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final order =
-          await (db.select(db.orders)..where(
-            (tbl) => tbl.id.equals('filled_buy_without_position'),
-          )).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final order = await (db.select(db.orders)
+            ..where(
+              (tbl) => tbl.id.equals('filled_buy_without_position'),
+            ))
+          .getSingle();
       expect(repaired, isTrue);
       expect(order.status, 'filled');
       expect(
@@ -992,8 +1031,8 @@ void main() {
       purpose: 'futuresLongGridBuy',
       positionSide: 'LONG',
     );
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: const Value('buyFilled'),
         lifecycleStatus: const Value('buyFilled'),
@@ -1010,12 +1049,12 @@ void main() {
       validateMissingOpenOrders: false,
     );
 
-    final refreshed =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-    final order =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals('renew_old_buy_1'))).getSingle();
+    final refreshed = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(level.id)))
+        .getSingle();
+    final order = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals('renew_old_buy_1')))
+        .getSingle();
     expect(order.status, 'filled');
     expect(
       order.errorMessage,
@@ -1049,8 +1088,8 @@ void main() {
         purpose: 'futuresLongGridBuy',
         positionSide: 'LONG',
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('buyOpen'),
           lifecycleStatus: const Value('buyOpen'),
@@ -1070,13 +1109,14 @@ void main() {
         level.id,
       );
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final order =
-          await (db.select(db.orders)..where(
-            (tbl) => tbl.id.equals('cancel_unknown_order_1'),
-          )).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final order = await (db.select(db.orders)
+            ..where(
+              (tbl) => tbl.id.equals('cancel_unknown_order_1'),
+            ))
+          .getSingle();
       expect(cancelled, 1);
       expect(order.status, 'cancelled');
       expect(refreshed.lifecycleStatus, 'waitingBuy');
@@ -1107,8 +1147,8 @@ void main() {
         purpose: 'futuresLongGridBuy',
         positionSide: 'LONG',
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('buyOpen'),
           lifecycleStatus: const Value('buyOpen'),
@@ -1120,13 +1160,14 @@ void main() {
 
       await service.renewFuturesLongGridLevel(level.id);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final order =
-          await (db.select(db.orders)..where(
-            (tbl) => tbl.id.equals('renew_active_residue_1'),
-          )).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final order = await (db.select(db.orders)
+            ..where(
+              (tbl) => tbl.id.equals('renew_active_residue_1'),
+            ))
+          .getSingle();
       expect(order.status, 'cancelled');
       expect(refreshed.lifecycleStatus, 'waitingBuy');
       expect(refreshed.activeOrderId, equals(null));
@@ -1156,11 +1197,13 @@ void main() {
         purpose: 'futuresLongGridBuy',
         positionSide: 'LONG',
       );
-      await (db.update(db.orders)..where(
-        (tbl) => tbl.id.equals('error_buy_history_1'),
-      )).write(const OrdersCompanion(errorMessage: Value('本地下单失败')));
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.orders)
+            ..where(
+              (tbl) => tbl.id.equals('error_buy_history_1'),
+            ))
+          .write(const OrdersCompanion(errorMessage: Value('本地下单失败')));
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -1189,12 +1232,12 @@ void main() {
 
       final repaired = await service.repairFuturesLongGridLevel(level.id);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final order =
-          await (db.select(db.orders)
-            ..where((tbl) => tbl.id.equals('error_buy_history_1'))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final order = await (db.select(db.orders)
+            ..where((tbl) => tbl.id.equals('error_buy_history_1')))
+          .getSingle();
       expect(repaired, isTrue);
       expect(order.status, 'filled');
       expect(order.errorMessage, equals(null));
@@ -1214,7 +1257,8 @@ void main() {
       final level = (await service.watchGridLevels(strategyId).first).first;
       final now = DateTime.utc(2026, 8, 16, 16);
       await (db.update(db.strategies)
-        ..where((tbl) => tbl.id.equals(strategyId))).write(
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .write(
         const StrategiesCompanion(
           status: Value('error'),
           lastError: Value('old startup error'),
@@ -1237,7 +1281,8 @@ void main() {
         reduceOnly: true,
       );
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals('released_sell_for_recover'))).write(
+            ..where((tbl) => tbl.id.equals('released_sell_for_recover')))
+          .write(
         const OrdersCompanion(
           errorMessage: Value('Binance 当前挂单和历史订单均无有效活动状态，已释放本地网格。'),
         ),
@@ -1248,9 +1293,9 @@ void main() {
         refreshFirst: false,
       );
 
-      final strategy =
-          await (db.select(db.strategies)
-            ..where((tbl) => tbl.id.equals(strategyId))).getSingle();
+      final strategy = await (db.select(db.strategies)
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .getSingle();
       expect(report.restored, isTrue);
       expect(strategy.status, 'running');
       expect(strategy.lastError, equals(null));
@@ -1275,8 +1320,8 @@ void main() {
         executedQuantity: '0',
         price: level.buyPrice ?? level.price,
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -1288,12 +1333,12 @@ void main() {
 
       await service.refreshGridLifecycle(strategyId);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final failedOrder =
-          await (db.select(db.orders)
-            ..where((tbl) => tbl.id.equals('failed_buy_1'))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final failedOrder = await (db.select(db.orders)
+            ..where((tbl) => tbl.id.equals('failed_buy_1')))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'waitingBuy');
       expect(refreshed.status, 'waitingBuy');
       expect(refreshed.activeOrderId, equals(null));
@@ -1334,8 +1379,8 @@ void main() {
         executedQuantity: '0',
         price: level.sellPrice ?? level.nextUpperPrice ?? level.price,
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -1349,12 +1394,12 @@ void main() {
 
       await service.refreshGridLifecycle(strategyId);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final failedOrder =
-          await (db.select(db.orders)
-            ..where((tbl) => tbl.id.equals('failed_sell_1'))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final failedOrder = await (db.select(db.orders)
+            ..where((tbl) => tbl.id.equals('failed_sell_1')))
+          .getSingle();
       expect(refreshed.lifecycleStatus, 'buyFilled');
       expect(refreshed.status, 'buyFilled');
       expect(refreshed.activeOrderId, equals(null));
@@ -1398,7 +1443,8 @@ void main() {
         price: level.sellPrice ?? level.nextUpperPrice ?? level.price,
       );
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals('unknown_rejected_sell_1'))).write(
+            ..where((tbl) => tbl.id.equals('unknown_rejected_sell_1')))
+          .write(
         const OrdersCompanion(
           errorCode: Value('-2010'),
           errorMessage: Value(
@@ -1406,8 +1452,8 @@ void main() {
           ),
         ),
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -1421,13 +1467,14 @@ void main() {
 
       await service.refreshGridLifecycle(strategyId);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final repairedOrder =
-          await (db.select(db.orders)..where(
-            (tbl) => tbl.id.equals('unknown_rejected_sell_1'),
-          )).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final repairedOrder = await (db.select(db.orders)
+            ..where(
+              (tbl) => tbl.id.equals('unknown_rejected_sell_1'),
+            ))
+          .getSingle();
       expect(repairedOrder.status, 'failed');
       expect(refreshed.lifecycleStatus, 'buyFilled');
       expect(refreshed.status, 'buyFilled');
@@ -1457,14 +1504,15 @@ void main() {
         price: level.buyPrice ?? level.price,
       );
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals('missing_buy_1'))).write(
+            ..where((tbl) => tbl.id.equals('missing_buy_1')))
+          .write(
         const OrdersCompanion(
           errorCode: Value('-2013'),
           errorMessage: Value('Order does not exist.'),
         ),
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('error'),
           lifecycleStatus: const Value('error'),
@@ -1476,12 +1524,12 @@ void main() {
 
       await service.refreshGridLifecycle(strategyId);
 
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).getSingle();
-      final repairedOrder =
-          await (db.select(db.orders)
-            ..where((tbl) => tbl.id.equals('missing_buy_1'))).getSingle();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(level.id)))
+          .getSingle();
+      final repairedOrder = await (db.select(db.orders)
+            ..where((tbl) => tbl.id.equals('missing_buy_1')))
+          .getSingle();
       expect(repairedOrder.status, 'failed');
       expect(refreshed.lifecycleStatus, 'waitingBuy');
       expect(refreshed.activeOrderId, equals(null));
@@ -1655,9 +1703,7 @@ void main() {
   test('PnL uses the current symbol futures profile scope', () async {
     final now = DateTime.utc(2026, 7, 10, 12);
     await _insertStrategy(db, id: 'btc_strategy', symbol: 'BTCUSDT');
-    await db
-        .into(db.symbolAccountBindings)
-        .insert(
+    await db.into(db.symbolAccountBindings).insert(
           SymbolAccountBindingsCompanion.insert(
             id: 'btc_binding',
             symbol: 'BTCUSDT',
@@ -1667,9 +1713,7 @@ void main() {
             updatedAt: now,
           ),
         );
-    await db
-        .into(db.hedgeActions)
-        .insert(
+    await db.into(db.hedgeActions).insert(
           HedgeActionsCompanion.insert(
             id: 'btc_hedge',
             strategyId: 'btc_strategy',
@@ -1850,9 +1894,7 @@ void main() {
       '100',
     );
 
-    await db
-        .into(db.appSettings)
-        .insertOnConflictUpdate(
+    await db.into(db.appSettings).insertOnConflictUpdate(
           AppSettingsCompanion.insert(
             key: LiveExchangeExecutionService.autoSpotGridDailyTurnoverLimitKey,
             value: '250',
@@ -1873,9 +1915,7 @@ Future<void> _insertStrategy(
   required String symbol,
 }) {
   final now = DateTime.now().toUtc();
-  return db
-      .into(db.strategies)
-      .insert(
+  return db.into(db.strategies).insert(
         StrategiesCompanion.insert(
           id: id,
           name: '$symbol strategy',
@@ -1921,7 +1961,10 @@ class _TestLiveExchangeExecutionService extends LiveExchangeExecutionService {
   }) async {}
 
   @override
-  Future<Decimal> currentFuturesLongQuantity(String symbol) async {
+  Future<Decimal> currentFuturesLongQuantity(
+    String symbol, {
+    String? keyProfileId,
+  }) async {
     return currentLongQuantity;
   }
 
@@ -1979,17 +2022,15 @@ Future<void> _insertGridOrder(
   String? positionSide,
   bool reduceOnly = false,
 }) async {
-  final existingGrid =
-      await (db.select(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(gridId))).getSingleOrNull();
+  final existingGrid = await (db.select(db.gridLevels)
+        ..where((tbl) => tbl.id.equals(gridId)))
+      .getSingleOrNull();
   if (existingGrid == null) {
-    final existingLevels =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+    final existingLevels = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
     final gridPrice = price ?? (side == 'BUY' ? '60000' : '61000');
-    await db
-        .into(db.gridLevels)
-        .insert(
+    await db.into(db.gridLevels).insert(
           GridLevelsCompanion.insert(
             id: gridId,
             strategyId: strategyId,
@@ -2008,9 +2049,7 @@ Future<void> _insertGridOrder(
         );
   }
 
-  await db
-      .into(db.orders)
-      .insert(
+  await db.into(db.orders).insert(
         OrdersCompanion.insert(
           id: id,
           strategyId: strategyId,
@@ -2030,17 +2069,15 @@ Future<void> _insertGridOrder(
           executedQuantity: Value(executedQuantity),
           averagePrice:
               averagePrice == null ? const Value.absent() : Value(averagePrice),
-          quoteQuantity:
-              status == 'filled'
-                  ? Value(quoteQuantity ?? '8.4')
-                  : const Value.absent(),
+          quoteQuantity: status == 'filled'
+              ? Value(quoteQuantity ?? '8.4')
+              : const Value.absent(),
           status: status,
           purpose: purpose ?? (side == 'BUY' ? 'gridBuy' : 'gridSell'),
           gridLevelId: Value(gridId),
-          parentOrderId:
-              parentOrderId == null
-                  ? const Value.absent()
-                  : Value(parentOrderId),
+          parentOrderId: parentOrderId == null
+              ? const Value.absent()
+              : Value(parentOrderId),
           reduceOnly: Value(reduceOnly),
           createdAt: createdAt,
           updatedAt: createdAt,
@@ -2070,9 +2107,7 @@ Future<void> _insertExchangeHistoricalOrder(
   String? positionSide,
   bool? reduceOnly,
 }) {
-  return db
-      .into(db.exchangeHistoricalOrders)
-      .insert(
+  return db.into(db.exchangeHistoricalOrders).insert(
         ExchangeHistoricalOrdersCompanion.insert(
           id: id,
           accountType: accountType,
@@ -2109,9 +2144,7 @@ Future<void> _insertAccountAsset(
 }) {
   final freeDecimal = Decimal.parse(free);
   final lockedDecimal = Decimal.parse(locked);
-  return db
-      .into(db.accountAssets)
-      .insertOnConflictUpdate(
+  return db.into(db.accountAssets).insertOnConflictUpdate(
         AccountAssetsCompanion.insert(
           id: 'spotSubAccount_${asset.toUpperCase()}',
           accountType: 'spotSubAccount',
@@ -2136,9 +2169,7 @@ Future<void> _insertFill(
   required String commission,
   required DateTime tradeTime,
 }) {
-  return db
-      .into(db.fills)
-      .insert(
+  return db.into(db.fills).insert(
         FillsCompanion.insert(
           id: id,
           strategyId: strategyId,

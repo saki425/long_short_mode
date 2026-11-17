@@ -208,8 +208,7 @@ class _FuturesLongReduceAvailability {
     required Decimal requestedQuantity,
     required Decimal desiredQuantity,
   }) {
-    final base =
-        'Binance 当前没有可用 LONG 可平数量。'
+    final base = 'Binance 当前没有可用 LONG 可平数量。'
         '计划平多=$requestedQuantity，当前层需要=$desiredQuantity，'
         '当前LONG持仓=$currentLong，'
         '已被reduceOnly平多挂单占用=$reservedReduceOnlySell，'
@@ -334,6 +333,8 @@ class LiveSpotGridEditableConfig {
     required this.futuresLeverage,
     required this.futuresPriceSource,
     required this.longEntryTriggerDistanceUsdt,
+    this.longEntryTriggerMode = longEntryTriggerModeNearPrice,
+    this.longEntryPrehangLevels = defaultLongEntryPrehangLevels,
     required this.shortHedgeMultiplier,
     required this.shortHedgeSpreadLevels,
   });
@@ -341,6 +342,9 @@ class LiveSpotGridEditableConfig {
   static const spotGridFuturesHedge = 'spotGridFuturesHedge';
   static const futuresGridHedge = 'futuresGridHedge';
   static const futuresMarkPrice = 'futuresMarkPrice';
+  static const longEntryTriggerModeNearPrice = 'nearPrice';
+  static const longEntryTriggerModePrehang = 'prehang';
+  static const defaultLongEntryPrehangLevels = 4;
 
   factory LiveSpotGridEditableConfig.defaults({
     required Decimal centerPrice,
@@ -377,6 +381,8 @@ class LiveSpotGridEditableConfig {
       futuresPriceSource: futuresMarkPrice,
       longEntryTriggerDistanceUsdt:
           AutoSpotGridExecutionService.defaultLongEntryTriggerDistanceUsdt,
+      longEntryTriggerMode: longEntryTriggerModeNearPrice,
+      longEntryPrehangLevels: defaultLongEntryPrehangLevels,
       shortHedgeMultiplier: Decimal.parse('1.2'),
       shortHedgeSpreadLevels: 4,
     );
@@ -408,6 +414,8 @@ class LiveSpotGridEditableConfig {
       futuresPriceSource: futuresMarkPrice,
       longEntryTriggerDistanceUsdt:
           AutoSpotGridExecutionService.defaultLongEntryTriggerDistanceUsdt,
+      longEntryTriggerMode: longEntryTriggerModeNearPrice,
+      longEntryPrehangLevels: defaultLongEntryPrehangLevels,
       shortHedgeMultiplier: Decimal.parse('1.2'),
       shortHedgeSpreadLevels: 4,
     );
@@ -445,6 +453,15 @@ class LiveSpotGridEditableConfig {
       longEntryTriggerDistanceUsdt: _parseDecimal(
         '${json['longEntryTriggerDistanceUsdt'] ?? '1'}',
       ),
+      longEntryTriggerMode:
+          '${json['longEntryTriggerMode'] ?? longEntryTriggerModeNearPrice}' ==
+                  longEntryTriggerModePrehang
+              ? longEntryTriggerModePrehang
+              : longEntryTriggerModeNearPrice,
+      longEntryPrehangLevels: int.tryParse(
+            '${json['longEntryPrehangLevels'] ?? defaultLongEntryPrehangLevels}',
+          ) ??
+          defaultLongEntryPrehangLevels,
       shortHedgeMultiplier: _parseDecimal(
         '${json['shortHedgeMultiplier'] ?? '1.2'}',
       ),
@@ -475,6 +492,8 @@ class LiveSpotGridEditableConfig {
   final int futuresLeverage;
   final String futuresPriceSource;
   final Decimal longEntryTriggerDistanceUsdt;
+  final String longEntryTriggerMode;
+  final int longEntryPrehangLevels;
   final Decimal shortHedgeMultiplier;
   final int shortHedgeSpreadLevels;
 
@@ -503,6 +522,8 @@ class LiveSpotGridEditableConfig {
     int? futuresLeverage,
     String? futuresPriceSource,
     Decimal? longEntryTriggerDistanceUsdt,
+    String? longEntryTriggerMode,
+    int? longEntryPrehangLevels,
     Decimal? shortHedgeMultiplier,
     int? shortHedgeSpreadLevels,
   }) {
@@ -532,6 +553,9 @@ class LiveSpotGridEditableConfig {
       futuresPriceSource: futuresPriceSource ?? this.futuresPriceSource,
       longEntryTriggerDistanceUsdt:
           longEntryTriggerDistanceUsdt ?? this.longEntryTriggerDistanceUsdt,
+      longEntryTriggerMode: longEntryTriggerMode ?? this.longEntryTriggerMode,
+      longEntryPrehangLevels:
+          longEntryPrehangLevels ?? this.longEntryPrehangLevels,
       shortHedgeMultiplier: shortHedgeMultiplier ?? this.shortHedgeMultiplier,
       shortHedgeSpreadLevels:
           shortHedgeSpreadLevels ?? this.shortHedgeSpreadLevels,
@@ -539,31 +563,33 @@ class LiveSpotGridEditableConfig {
   }
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'symbol': symbol,
-    'executionMode': executionMode,
-    'centerPrice': centerPrice.toString(),
-    'lowerPrice': lowerPrice.toString(),
-    'upperPrice': upperPrice.toString(),
-    'gridMode': gridMode,
-    'gridIntervalCount': gridIntervalCount,
-    'initialBuyOrderCount': initialBuyOrderCount,
-    'initialSellOrderCount': initialSellOrderCount,
-    'maxOpenOrders': maxOpenOrders,
-    'spotCapital': spotCapital.toString(),
-    'initialBtcRatio': initialBtcRatio.toString(),
-    'singleGridAmount': singleGridAmount.toString(),
-    'maxLossUsdt': maxLossUsdt.toString(),
-    'dailyMaxLossUsdt': dailyMaxLossUsdt.toString(),
-    'outOfRangeAction': outOfRangeAction,
-    'enableFutureHedgeGrid': enableFutureHedgeGrid.toString(),
-    'futureGridOffset': futureGridOffset.toString(),
-    'futuresLeverage': futuresLeverage.toString(),
-    'futuresPriceSource': futuresPriceSource,
-    'longEntryTriggerDistanceUsdt': longEntryTriggerDistanceUsdt.toString(),
-    'shortHedgeMultiplier': shortHedgeMultiplier.toString(),
-    'shortHedgeSpreadLevels': shortHedgeSpreadLevels.toString(),
-  };
+        'name': name,
+        'symbol': symbol,
+        'executionMode': executionMode,
+        'centerPrice': centerPrice.toString(),
+        'lowerPrice': lowerPrice.toString(),
+        'upperPrice': upperPrice.toString(),
+        'gridMode': gridMode,
+        'gridIntervalCount': gridIntervalCount,
+        'initialBuyOrderCount': initialBuyOrderCount,
+        'initialSellOrderCount': initialSellOrderCount,
+        'maxOpenOrders': maxOpenOrders,
+        'spotCapital': spotCapital.toString(),
+        'initialBtcRatio': initialBtcRatio.toString(),
+        'singleGridAmount': singleGridAmount.toString(),
+        'maxLossUsdt': maxLossUsdt.toString(),
+        'dailyMaxLossUsdt': dailyMaxLossUsdt.toString(),
+        'outOfRangeAction': outOfRangeAction,
+        'enableFutureHedgeGrid': enableFutureHedgeGrid.toString(),
+        'futureGridOffset': futureGridOffset.toString(),
+        'futuresLeverage': futuresLeverage.toString(),
+        'futuresPriceSource': futuresPriceSource,
+        'longEntryTriggerDistanceUsdt': longEntryTriggerDistanceUsdt.toString(),
+        'longEntryTriggerMode': longEntryTriggerMode,
+        'longEntryPrehangLevels': longEntryPrehangLevels,
+        'shortHedgeMultiplier': shortHedgeMultiplier.toString(),
+        'shortHedgeSpreadLevels': shortHedgeSpreadLevels.toString(),
+      };
 
   PaperStrategyConfig toPaperConfig() {
     return PaperStrategyConfig(
@@ -775,30 +801,29 @@ class LiveSpotGridDryRunReport {
 
   String toDisplayText() {
     final baseAsset = _baseAssetForSymbol(symbol);
-    final buffer =
-        StringBuffer()
-          ..writeln(ok ? '启动预演通过' : '启动预演失败')
-          ..writeln('gridIntervalCount 价格区间数量: $gridIntervalCount')
-          ..writeln('gridLevelCount 价格节点数量: $gridLevelCount')
-          ..writeln(
-            'initialActiveOrderCount 启动提交订单数量: $initialActiveOrderCount',
-          )
-          ..writeln('maxOpenOrders 最大活动挂单数量: $maxOpenOrders')
-          ..writeln('首次 BUY 单数: $initialBuyOrderCount')
-          ..writeln('启动直接提交 SELL 单数: 0（SELL 只在对应 BUY 成交后创建）')
-          ..writeln('当前价格: $currentPrice')
-          ..writeln('区间: $lowerPrice - $upperPrice')
-          ..writeln('初始 $baseAsset 需要量: $initialBtcRequired')
-          ..writeln('账户可用 $baseAsset: $availableBtc')
-          ..writeln('账户可用 USDT: $availableUsdt')
-          ..writeln('外部 $baseAsset: $externalBtc')
-          ..writeln('未分类 $baseAsset: $unclassifiedBtc')
-          ..writeln('预计首次挂单数量: $estimatedFirstOrderCount')
-          ..writeln('预计占用 USDT: $estimatedReservedUsdt')
-          ..writeln('预计占用 $baseAsset: $estimatedReservedBtc')
-          ..writeln('预计手续费: $estimatedFeeUsdt USDT')
-          ..writeln('交易所 $symbol 挂单: $exchangeOpenOrderCount')
-          ..writeln('未知 $symbol 挂单: $unknownOpenOrderCount');
+    final buffer = StringBuffer()
+      ..writeln(ok ? '启动预演通过' : '启动预演失败')
+      ..writeln('gridIntervalCount 价格区间数量: $gridIntervalCount')
+      ..writeln('gridLevelCount 价格节点数量: $gridLevelCount')
+      ..writeln(
+        'initialActiveOrderCount 启动提交订单数量: $initialActiveOrderCount',
+      )
+      ..writeln('maxOpenOrders 最大活动挂单数量: $maxOpenOrders')
+      ..writeln('首次 BUY 单数: $initialBuyOrderCount')
+      ..writeln('启动直接提交 SELL 单数: 0（SELL 只在对应 BUY 成交后创建）')
+      ..writeln('当前价格: $currentPrice')
+      ..writeln('区间: $lowerPrice - $upperPrice')
+      ..writeln('初始 $baseAsset 需要量: $initialBtcRequired')
+      ..writeln('账户可用 $baseAsset: $availableBtc')
+      ..writeln('账户可用 USDT: $availableUsdt')
+      ..writeln('外部 $baseAsset: $externalBtc')
+      ..writeln('未分类 $baseAsset: $unclassifiedBtc')
+      ..writeln('预计首次挂单数量: $estimatedFirstOrderCount')
+      ..writeln('预计占用 USDT: $estimatedReservedUsdt')
+      ..writeln('预计占用 $baseAsset: $estimatedReservedBtc')
+      ..writeln('预计手续费: $estimatedFeeUsdt USDT')
+      ..writeln('交易所 $symbol 挂单: $exchangeOpenOrderCount')
+      ..writeln('未知 $symbol 挂单: $unknownOpenOrderCount');
     if (failures.isNotEmpty) {
       buffer.writeln('失败项:');
       for (final failure in failures) {
@@ -844,16 +869,15 @@ class LiveSpotGridRecoveryReport {
 
   String toDisplayText() {
     final baseAsset = _baseAssetForSymbol(symbol);
-    final buffer =
-        StringBuffer()
-          ..writeln(safeToResume ? '恢复报告: 可安全恢复' : '恢复报告: 需要人工处理')
-          ..writeln('Binance 挂单数量: $binanceOpenOrders')
-          ..writeln('本地挂单数量: $localOpenOrders')
-          ..writeln('新发现成交: $newFills')
-          ..writeln('状态不一致订单: $statusMismatches')
-          ..writeln('缺失反向订单: $missingReverseOrders')
-          ..writeln('strategy$baseAsset: $strategyBtc')
-          ..writeln('账户 $baseAsset: $accountBtc');
+    final buffer = StringBuffer()
+      ..writeln(safeToResume ? '恢复报告: 可安全恢复' : '恢复报告: 需要人工处理')
+      ..writeln('Binance 挂单数量: $binanceOpenOrders')
+      ..writeln('本地挂单数量: $localOpenOrders')
+      ..writeln('新发现成交: $newFills')
+      ..writeln('状态不一致订单: $statusMismatches')
+      ..writeln('缺失反向订单: $missingReverseOrders')
+      ..writeln('strategy$baseAsset: $strategyBtc')
+      ..writeln('账户 $baseAsset: $accountBtc');
     for (final message in messages) {
       buffer.writeln('- $message');
     }
@@ -875,13 +899,12 @@ class LiveSpotGridResetReport {
   final int disabledGridLevels;
 
   String toDisplayText() {
-    final buffer =
-        StringBuffer()
-          ..writeln(failedExchangeCancels == 0 ? '重置测试环境完成' : '重置测试环境未完成')
-          ..writeln('已撤销 Binance 现货挂单: $cancelledExchangeOrders')
-          ..writeln('撤单失败: $failedExchangeCancels')
-          ..writeln('已归档 LIVE 现货网格策略: $archivedStrategies')
-          ..write('已禁用本地网格计划: $disabledGridLevels');
+    final buffer = StringBuffer()
+      ..writeln(failedExchangeCancels == 0 ? '重置测试环境完成' : '重置测试环境未完成')
+      ..writeln('已撤销 Binance 现货挂单: $cancelledExchangeOrders')
+      ..writeln('撤单失败: $failedExchangeCancels')
+      ..writeln('已归档 LIVE 现货网格策略: $archivedStrategies')
+      ..write('已禁用本地网格计划: $disabledGridLevels');
     if (failedExchangeCancels > 0) {
       buffer
         ..writeln()
@@ -938,10 +961,9 @@ class AutoSpotGridExecutionService {
     required this.logRepository,
     FutureGridEngine? futureGridEngine,
     GridGenerator gridGenerator = const GridGenerator(),
-  }) : _gridGenerator = gridGenerator,
-       futureGridEngine =
-           futureGridEngine ??
-           FutureGridEngine(db: db, liveExecution: liveExecution);
+  })  : _gridGenerator = gridGenerator,
+        futureGridEngine = futureGridEngine ??
+            FutureGridEngine(db: db, liveExecution: liveExecution);
 
   static const environment = 'LIVE_SPOT_GRID';
   static const futuresGridEnvironment = 'LIVE_FUTURES_GRID';
@@ -998,14 +1020,15 @@ class AutoSpotGridExecutionService {
     Decimal defaultValue,
     String? symbol,
   ) async {
-    final binding =
-        symbol == null
-            ? null
-            : await (db.select(db.symbolAccountBindings)..where(
-              (tbl) =>
-                  tbl.symbol.equals(symbol.toUpperCase()) &
-                  tbl.environment.equals('live'),
-            )).getSingleOrNull();
+    final binding = symbol == null
+        ? null
+        : await (db.select(db.symbolAccountBindings)
+              ..where(
+                (tbl) =>
+                    tbl.symbol.equals(symbol.toUpperCase()) &
+                    tbl.environment.equals('live'),
+              ))
+            .getSingleOrNull();
     final raw = await AppUiSettings.readScopedSettingValue(
       db,
       key: key,
@@ -1057,9 +1080,12 @@ class AutoSpotGridExecutionService {
   }
 
   Stream<List<Order>> watchGridOrders(String strategyId) {
-    return (db.select(db.orders)..where(
-      (tbl) => tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
-    )).watch();
+    return (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
+          ))
+        .watch();
   }
 
   Stream<Strategy?> watchActiveFuturesGridStrategy({String? symbol}) {
@@ -1125,10 +1151,9 @@ class AutoSpotGridExecutionService {
           .catchError((_) => null);
     }
     final tick = marketData.currentMarketTicks[normalizedSymbol];
-    final center =
-        isFutures
-            ? tick?.futures?.markPrice ?? Decimal.fromInt(60000)
-            : tick?.spot?.midPrice ?? Decimal.fromInt(60000);
+    final center = isFutures
+        ? tick?.futures?.markPrice ?? Decimal.fromInt(60000)
+        : tick?.spot?.midPrice ?? Decimal.fromInt(60000);
     final editConfig = LiveSpotGridEditableConfig.defaults(
       centerPrice: center,
       name: name,
@@ -1148,9 +1173,7 @@ class AutoSpotGridExecutionService {
         '${isFutures ? 'live_futures_grid' : 'live_spot_grid'}_${_uuid.v4()}';
     final now = DateTime.now().toUtc();
     await db.transaction(() async {
-      await db
-          .into(db.strategies)
-          .insert(
+      await db.into(db.strategies).insert(
             StrategiesCompanion.insert(
               id: strategyId,
               name: config.name,
@@ -1196,10 +1219,11 @@ class AutoSpotGridExecutionService {
     if (strategy == null) {
       return null;
     }
-    final row =
-        await (db.select(db.appSettings)..where(
-          (tbl) => tbl.key.equals(_configKey(strategyId)),
-        )).getSingleOrNull();
+    final row = await (db.select(db.appSettings)
+          ..where(
+            (tbl) => tbl.key.equals(_configKey(strategyId)),
+          ))
+        .getSingleOrNull();
     if (row == null) {
       return LiveSpotGridEditableConfig.fromStrategy(strategy);
     }
@@ -1220,11 +1244,12 @@ class AutoSpotGridExecutionService {
     if (strategy == null) {
       throw StateError('策略不存在');
     }
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
+          ))
+        .get();
     if (!_canEditStatus(strategy.status) || orders.isNotEmpty) {
       throw StateError('当前状态不允许编辑。请先停止策略并确认没有活动订单。');
     }
@@ -1243,7 +1268,8 @@ class AutoSpotGridExecutionService {
     final now = DateTime.now().toUtc();
     await db.transaction(() async {
       await (db.update(db.strategies)
-        ..where((tbl) => tbl.id.equals(strategyId))).write(
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .write(
         StrategiesCompanion(
           name: Value(editConfig.name),
           environment: Value(
@@ -1262,9 +1288,11 @@ class AutoSpotGridExecutionService {
         ),
       );
       await (db.delete(db.gridLevels)
-        ..where((tbl) => tbl.strategyId.equals(strategyId))).go();
+            ..where((tbl) => tbl.strategyId.equals(strategyId)))
+          .go();
       await (db.delete(db.futureGridOrders)
-        ..where((tbl) => tbl.strategyId.equals(strategyId))).go();
+            ..where((tbl) => tbl.strategyId.equals(strategyId)))
+          .go();
       await _insertGrid(
         strategyId,
         config,
@@ -1291,9 +1319,11 @@ class AutoSpotGridExecutionService {
     _validateMaxOpenOrders(updated);
     await db.transaction(() async {
       await _saveEditableConfig(strategyId, updated);
-      await (db.update(db.strategies)..where(
-        (tbl) => tbl.id.equals(strategyId),
-      )).write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
+      await (db.update(db.strategies)
+            ..where(
+              (tbl) => tbl.id.equals(strategyId),
+            ))
+          .write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
     });
   }
 
@@ -1312,9 +1342,56 @@ class AutoSpotGridExecutionService {
     final updated = config.copyWith(futuresLeverage: leverage.clamp(1, 125));
     await db.transaction(() async {
       await _saveEditableConfig(strategyId, updated);
-      await (db.update(db.strategies)..where(
-        (tbl) => tbl.id.equals(strategyId),
-      )).write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
+      await (db.update(db.strategies)
+            ..where(
+              (tbl) => tbl.id.equals(strategyId),
+            ))
+          .write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
+    });
+  }
+
+  Future<void> updateFuturesLongTriggerSettings(
+    String strategyId, {
+    required String triggerMode,
+    required Decimal triggerDistanceUsdt,
+    required int prehangLevels,
+    required int maxOpenOrders,
+  }) async {
+    final strategy = await _strategy(strategyId);
+    if (strategy == null) {
+      throw StateError('策略不存在');
+    }
+    if (strategy.environment != futuresGridEnvironment) {
+      throw StateError('当前策略不是 LIVE 合约 LONG 网格策略。');
+    }
+    final config = await loadEditableConfig(strategyId);
+    if (config == null) {
+      throw StateError('策略配置不存在');
+    }
+    final normalizedMode =
+        triggerMode == LiveSpotGridEditableConfig.longEntryTriggerModePrehang
+            ? LiveSpotGridEditableConfig.longEntryTriggerModePrehang
+            : LiveSpotGridEditableConfig.longEntryTriggerModeNearPrice;
+    if (triggerDistanceUsdt < Decimal.zero) {
+      throw StateError('提前触发距离不能小于 0');
+    }
+    if (prehangLevels <= 0) {
+      throw StateError('预挂层数必须大于 0');
+    }
+    final updated = config.copyWith(
+      longEntryTriggerMode: normalizedMode,
+      longEntryTriggerDistanceUsdt: triggerDistanceUsdt,
+      longEntryPrehangLevels: prehangLevels,
+      maxOpenOrders: maxOpenOrders,
+    );
+    _validateMaxOpenOrders(updated);
+    await db.transaction(() async {
+      await _saveEditableConfig(strategyId, updated);
+      await (db.update(db.strategies)
+            ..where(
+              (tbl) => tbl.id.equals(strategyId),
+            ))
+          .write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
     });
   }
 
@@ -1340,9 +1417,11 @@ class AutoSpotGridExecutionService {
     );
     await db.transaction(() async {
       await _saveEditableConfig(strategyId, updated);
-      await (db.update(db.strategies)..where(
-        (tbl) => tbl.id.equals(strategyId),
-      )).write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
+      await (db.update(db.strategies)
+            ..where(
+              (tbl) => tbl.id.equals(strategyId),
+            ))
+          .write(StrategiesCompanion(updatedAt: Value(DateTime.now().toUtc())));
     });
   }
 
@@ -1355,13 +1434,14 @@ class AutoSpotGridExecutionService {
       throw StateError('当前策略不是 LIVE 合约 LONG 网格策略。');
     }
     await _resetStaleFuturesLongSubmissions(strategyId);
-    final hasActive =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(futuresLongSource) &
-              tbl.status.isIn(['new', 'partiallyFilled', 'cancelling']),
-        )).get();
+    final hasActive = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(futuresLongSource) &
+                tbl.status.isIn(['new', 'partiallyFilled', 'cancelling']),
+          ))
+        .get();
     if (hasActive.isEmpty) {
       await _setStatus(
         strategyId,
@@ -1382,9 +1462,9 @@ class AutoSpotGridExecutionService {
     if (!_canEditStatus(strategy.status)) {
       throw StateError('当前状态不允许移动网格。请先停止策略并处理边缘挂单/尾单。');
     }
-    final levels =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+    final levels = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
     final priced = levels
         .where((level) => _gridBuyPrice(level) != null)
         .toList(growable: false);
@@ -1403,10 +1483,9 @@ class AutoSpotGridExecutionService {
     final anchor = up ? sorted.last : sorted.first;
     final direction = up ? Decimal.fromInt(1) : -Decimal.fromInt(1);
     final newBuy = _gridBuyPrice(anchor)! + gridStep * direction;
-    final sellStep =
-        _gridSellPrice(anchor) == null
-            ? gridStep
-            : _gridSellPrice(anchor)! - _gridBuyPrice(anchor)!;
+    final sellStep = _gridSellPrice(anchor) == null
+        ? gridStep
+        : _gridSellPrice(anchor)! - _gridBuyPrice(anchor)!;
     final newSell = newBuy + sellStep;
     final config = await loadEditableConfig(strategyId);
     if (config == null) {
@@ -1428,28 +1507,27 @@ class AutoSpotGridExecutionService {
     } else {
       rules = liveExecution.spotRulesForSymbol(strategy.symbol);
     }
-    final perGridNotional =
-        isFutures
-            ? movedConfig.singleGridAmount *
-                Decimal.fromInt(movedConfig.futuresLeverage.clamp(1, 125))
-            : movedConfig.singleGridAmount;
-    final qty =
-        rules?.quantizeQuantity(
+    final perGridNotional = isFutures
+        ? movedConfig.singleGridAmount *
+            Decimal.fromInt(movedConfig.futuresLeverage.clamp(1, 125))
+        : movedConfig.singleGridAmount;
+    final qty = rules?.quantizeQuantity(
           (perGridNotional / newBuy).toDecimal(scaleOnInfinitePrecision: 8),
         ) ??
         (perGridNotional / newBuy).toDecimal(scaleOnInfinitePrecision: 8);
     final now = DateTime.now().toUtc();
     await db.transaction(() async {
-      await (db.delete(db.futureGridOrders)..where(
-        (tbl) =>
-            tbl.spotGridOrderId.equals(leaving.id) &
-            tbl.status.isIn(['WAIT_TRIGGER', 'WAIT_OPEN']),
-      )).go();
+      await (db.delete(db.futureGridOrders)
+            ..where(
+              (tbl) =>
+                  tbl.spotGridOrderId.equals(leaving.id) &
+                  tbl.status.isIn(['WAIT_TRIGGER', 'WAIT_OPEN']),
+            ))
+          .go();
       await (db.delete(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(leaving.id))).go();
-      await db
-          .into(db.gridLevels)
-          .insert(
+            ..where((tbl) => tbl.id.equals(leaving.id)))
+          .go();
+      await db.into(db.gridLevels).insert(
             GridLevelsCompanion.insert(
               id: '${strategyId}_grid_move_${_uuid.v4()}',
               strategyId: strategyId,
@@ -1473,17 +1551,20 @@ class AutoSpotGridExecutionService {
               updatedAt: now,
             ),
           );
-      final refreshed =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+      final refreshed = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.strategyId.equals(strategyId)))
+          .get();
       refreshed.sort((a, b) => _gridBuyPrice(a)!.compareTo(_gridBuyPrice(b)!));
       for (var i = 0; i < refreshed.length; i += 1) {
-        await (db.update(db.gridLevels)..where(
-          (tbl) => tbl.id.equals(refreshed[i].id),
-        )).write(GridLevelsCompanion(gridIndex: Value(i)));
+        await (db.update(db.gridLevels)
+              ..where(
+                (tbl) => tbl.id.equals(refreshed[i].id),
+              ))
+            .write(GridLevelsCompanion(gridIndex: Value(i)));
       }
       await (db.update(db.strategies)
-        ..where((tbl) => tbl.id.equals(strategyId))).write(
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .write(
         StrategiesCompanion(
           lowerPrice: Value(_s(movedConfig.lowerPrice)),
           upperPrice: Value(_s(movedConfig.upperPrice)),
@@ -1499,21 +1580,21 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _ensureMovableEdgeLevel(GridLevel level) async {
-    final orders =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.gridLevelId.equals(level.id))).get();
+    final orders = await (db.select(db.orders)
+          ..where((tbl) => tbl.gridLevelId.equals(level.id)))
+        .get();
     if (orders.isNotEmpty) {
       throw StateError('边缘网格已有订单记录，不能直接移动。请先撤单、平尾单或归档旧策略。');
     }
-    final cycles =
-        await (db.select(db.completedGridCycles)
-          ..where((tbl) => tbl.gridId.equals(level.id))).get();
+    final cycles = await (db.select(db.completedGridCycles)
+          ..where((tbl) => tbl.gridId.equals(level.id)))
+        .get();
     if (cycles.isNotEmpty) {
       throw StateError('边缘网格已有完成循环，不能直接移动。请归档旧策略或保留历史层。');
     }
-    final futures =
-        await (db.select(db.futureGridOrders)
-          ..where((tbl) => tbl.spotGridOrderId.equals(level.id))).get();
+    final futures = await (db.select(db.futureGridOrders)
+          ..where((tbl) => tbl.spotGridOrderId.equals(level.id)))
+        .get();
     final blockingFutures = futures
         .where(
           (row) => row.status != 'WAIT_TRIGGER' && row.status != 'WAIT_OPEN',
@@ -1562,6 +1643,8 @@ class AutoSpotGridExecutionService {
       futuresLeverage: config.futuresLeverage,
       futuresPriceSource: config.futuresPriceSource,
       longEntryTriggerDistanceUsdt: config.longEntryTriggerDistanceUsdt,
+      longEntryTriggerMode: config.longEntryTriggerMode,
+      longEntryPrehangLevels: config.longEntryPrehangLevels,
       shortHedgeMultiplier: config.shortHedgeMultiplier,
       shortHedgeSpreadLevels: config.shortHedgeSpreadLevels,
     );
@@ -1570,17 +1653,14 @@ class AutoSpotGridExecutionService {
     final now = DateTime.now().toUtc();
     final paper = copied.toPaperConfig();
     await db.transaction(() async {
-      await db
-          .into(db.strategies)
-          .insert(
+      await db.into(db.strategies).insert(
             StrategiesCompanion.insert(
               id: newId,
               name: copied.name,
               symbol: copied.symbol,
-              environment:
-                  copied.isFuturesGridHedge
-                      ? futuresGridEnvironment
-                      : environment,
+              environment: copied.isFuturesGridHedge
+                  ? futuresGridEnvironment
+                  : environment,
               status: 'idle',
               createdAt: now,
               lowerPrice: _s(copied.lowerPrice),
@@ -1619,21 +1699,25 @@ class AutoSpotGridExecutionService {
     if (!_canEditStatus(strategy.status)) {
       throw StateError('当前状态不允许删除策略');
     }
-    final orders =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+    final orders = await (db.select(db.orders)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
     if (orders.isNotEmpty) {
       throw StateError('策略已有订单审计记录，不能删除。请保留历史或复制新策略。');
     }
     await db.transaction(() async {
       await (db.delete(db.gridLevels)
-        ..where((tbl) => tbl.strategyId.equals(strategyId))).go();
+            ..where((tbl) => tbl.strategyId.equals(strategyId)))
+          .go();
       await (db.delete(db.futureGridOrders)
-        ..where((tbl) => tbl.strategyId.equals(strategyId))).go();
+            ..where((tbl) => tbl.strategyId.equals(strategyId)))
+          .go();
       await (db.delete(db.appSettings)
-        ..where((tbl) => tbl.key.equals(_configKey(strategyId)))).go();
+            ..where((tbl) => tbl.key.equals(_configKey(strategyId))))
+          .go();
       await (db.delete(db.strategies)
-        ..where((tbl) => tbl.id.equals(strategyId))).go();
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .go();
     });
   }
 
@@ -1642,28 +1726,29 @@ class AutoSpotGridExecutionService {
     if (strategy == null) {
       throw StateError('策略不存在');
     }
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
-        )).get();
-    final active =
-        orders
-            .where(
-              (order) => [
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-              ].contains(order.status),
-            )
-            .length;
-    final waiting =
-        await (db.select(db.gridLevels)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.status.isIn(['waiting', 'ready']),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
+          ))
+        .get();
+    final active = orders
+        .where(
+          (order) => [
+            'created',
+            'submitting',
+            'new',
+            'partiallyFilled',
+          ].contains(order.status),
+        )
+        .length;
+    final waiting = await (db.select(db.gridLevels)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.status.isIn(['waiting', 'ready']),
+          ))
+        .get();
     final completed = orders.where((order) => order.status == 'filled').length;
     final submitted = orders.any(
       (order) => order.exchangeOrderId != null || order.status != 'created',
@@ -1686,40 +1771,33 @@ class AutoSpotGridExecutionService {
     final symbol = strategy?.symbol ?? 'BTCUSDT';
     final baseAsset = _baseAssetForSymbol(symbol);
     final baseAssetRow = await _latestAccountAsset(baseAsset);
-    final otherStrategies =
-        await (db.select(db.strategies)..where(
-          (tbl) =>
-              tbl.environment.equals(environment) &
-              tbl.symbol.equals(symbol) &
-              tbl.id.equals(strategyId).not(),
-        )).get();
+    final otherStrategies = await (db.select(db.strategies)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals(environment) &
+                tbl.symbol.equals(symbol) &
+                tbl.id.equals(strategyId).not(),
+          ))
+        .get();
     final otherStrategyBtc = otherStrategies.fold<Decimal>(
       Decimal.zero,
       (sum, row) => sum + _d(row.strategySpotBtc),
     );
-    final accountTotal =
-        baseAsset == 'BTC'
-            ? (snapshot == null ? Decimal.zero : _d(snapshot.accountTotalBtc))
-            : _assetTotal(baseAssetRow);
-    final baseFree =
-        baseAsset == 'BTC'
-            ? (snapshot == null ? Decimal.zero : _d(snapshot.btcFree))
-            : _assetFree(baseAssetRow);
-    final baseLocked =
-        baseAsset == 'BTC'
-            ? (snapshot == null ? Decimal.zero : _d(snapshot.btcLocked))
-            : _assetLocked(baseAssetRow);
-    final unclassified =
-        baseAsset == 'BTC'
-            ? (snapshot == null ? Decimal.zero : _d(snapshot.unclassifiedBtc))
-            : accountTotal -
-                otherStrategyBtc -
-                (strategy == null
-                    ? Decimal.zero
-                    : _d(strategy.strategySpotBtc)) -
-                (strategy == null
-                    ? Decimal.zero
-                    : _d(strategy.externalSpotBtc));
+    final accountTotal = baseAsset == 'BTC'
+        ? (snapshot == null ? Decimal.zero : _d(snapshot.accountTotalBtc))
+        : _assetTotal(baseAssetRow);
+    final baseFree = baseAsset == 'BTC'
+        ? (snapshot == null ? Decimal.zero : _d(snapshot.btcFree))
+        : _assetFree(baseAssetRow);
+    final baseLocked = baseAsset == 'BTC'
+        ? (snapshot == null ? Decimal.zero : _d(snapshot.btcLocked))
+        : _assetLocked(baseAssetRow);
+    final unclassified = baseAsset == 'BTC'
+        ? (snapshot == null ? Decimal.zero : _d(snapshot.unclassifiedBtc))
+        : accountTotal -
+            otherStrategyBtc -
+            (strategy == null ? Decimal.zero : _d(strategy.strategySpotBtc)) -
+            (strategy == null ? Decimal.zero : _d(strategy.externalSpotBtc));
     return LiveSpotBtcInventory(
       accountTotalBtc: accountTotal,
       btcFree: baseFree,
@@ -1749,10 +1827,9 @@ class AutoSpotGridExecutionService {
     if (strategyBtc < Decimal.zero || externalBtc < Decimal.zero) {
       throw StateError('$baseAsset 归属数量不能为负数。');
     }
-    final total =
-        baseAsset == 'BTC'
-            ? _d(snapshot!.accountTotalBtc)
-            : _assetTotal(baseAssetRow);
+    final total = baseAsset == 'BTC'
+        ? _d(snapshot!.accountTotalBtc)
+        : _assetTotal(baseAssetRow);
     final assigned = strategyBtc + externalBtc;
     if (assigned > total) {
       throw StateError(
@@ -1764,14 +1841,14 @@ class AutoSpotGridExecutionService {
         strategy == null ? Decimal.zero : _d(strategy.strategySpotBtc);
     final oldExternal =
         strategy == null ? Decimal.zero : _d(strategy.externalSpotBtc);
-    final oldUnclassified =
-        baseAsset == 'BTC' && snapshot != null
-            ? _d(snapshot.unclassifiedBtc)
-            : total - oldStrategy - oldExternal;
+    final oldUnclassified = baseAsset == 'BTC' && snapshot != null
+        ? _d(snapshot.unclassifiedBtc)
+        : total - oldStrategy - oldExternal;
     await db.transaction(() async {
       if (baseAsset == 'BTC' && snapshot != null) {
         await (db.update(db.spotAccountSnapshots)
-          ..where((tbl) => tbl.id.equals(snapshot.id))).write(
+              ..where((tbl) => tbl.id.equals(snapshot.id)))
+            .write(
           SpotAccountSnapshotsCompanion(
             strategyTrackedBtc: Value(_s(strategyBtc)),
             externalBtc: Value(_s(externalBtc)),
@@ -1780,7 +1857,8 @@ class AutoSpotGridExecutionService {
         );
       }
       await (db.update(db.strategies)
-        ..where((tbl) => tbl.id.equals(strategyId))).write(
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .write(
         StrategiesCompanion(
           strategySpotBtc: Value(_s(strategyBtc)),
           externalSpotBtc: Value(_s(externalBtc)),
@@ -1790,9 +1868,7 @@ class AutoSpotGridExecutionService {
       );
       final now = DateTime.now().toUtc();
       if (strategyBtc != oldStrategy) {
-        await db
-            .into(db.assetClassificationEvents)
-            .insert(
+        await db.into(db.assetClassificationEvents).insert(
               AssetClassificationEventsCompanion.insert(
                 id: _uuid.v4(),
                 asset: baseAsset,
@@ -1806,9 +1882,7 @@ class AutoSpotGridExecutionService {
             );
       }
       if (externalBtc != oldExternal || unclassified != oldUnclassified) {
-        await db
-            .into(db.assetClassificationEvents)
-            .insert(
+        await db.into(db.assetClassificationEvents).insert(
               AssetClassificationEventsCompanion.insert(
                 id: _uuid.v4(),
                 asset: baseAsset,
@@ -1829,67 +1903,72 @@ class AutoSpotGridExecutionService {
   ) async {
     final currentStrategy = await _strategy(strategyId);
     final currentSymbol = currentStrategy?.symbol;
-    final rows =
-        await (db.select(db.strategies)..where(
-          (tbl) =>
-              tbl.environment.equals(environment) &
-              tbl.id.equals(strategyId).not() &
-              (currentSymbol == null
-                  ? const Constant(true)
-                  : tbl.symbol.equals(currentSymbol)) &
-              tbl.status.isIn(_needsResolutionStatuses),
-        )).get();
+    final rows = await (db.select(db.strategies)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals(environment) &
+                tbl.id.equals(strategyId).not() &
+                (currentSymbol == null
+                    ? const Constant(true)
+                    : tbl.symbol.equals(currentSymbol)) &
+                tbl.status.isIn(_needsResolutionStatuses),
+          ))
+        .get();
     final conflicts = <LiveSpotGridConflict>[];
     for (final row in rows) {
       final baseAsset = _baseAssetForSymbol(row.symbol);
       final inventory = await loadBtcInventory(row.id);
-      final localActive =
-          await (db.select(db.orders)..where(
-            (tbl) =>
-                tbl.strategyId.equals(row.id) &
-                tbl.status.isIn([
-                  'created',
-                  'submitting',
-                  'new',
-                  'partiallyFilled',
-                  'cancelling',
-                ]),
-          )).get();
-      final completed =
-          await (db.select(db.orders)..where(
-            (tbl) =>
-                tbl.strategyId.equals(row.id) &
-                tbl.source.equals(source) &
-                tbl.status.equals('filled'),
-          )).get();
-      final cancelled =
-          await (db.select(db.orders)..where(
-            (tbl) =>
-                tbl.strategyId.equals(row.id) &
-                tbl.source.equals(source) &
-                tbl.status.equals('cancelled'),
-          )).get();
-      final unknown =
-          await (db.select(db.orders)..where(
-            (tbl) =>
-                tbl.strategyId.equals(row.id) &
-                tbl.source.equals(source) &
-                tbl.status.equals('unknown'),
-          )).get();
-      final binanceActive =
-          await (db.select(db.exchangeOpenOrders)..where(
-            (tbl) =>
-                tbl.environment.equals('live') &
-                tbl.marketType.equals('spot') &
-                tbl.symbol.equals(row.symbol) &
-                tbl.clientOrderId.like('$clientOrderPrefix%'),
-          )).get();
-      final lastReconcile =
-          await (db.select(db.reconciliationRuns)
-                ..where((tbl) => tbl.summaryJson.like('%${row.id}%'))
-                ..orderBy([(tbl) => OrderingTerm.desc(tbl.startedAt)])
-                ..limit(1))
-              .getSingleOrNull();
+      final localActive = await (db.select(db.orders)
+            ..where(
+              (tbl) =>
+                  tbl.strategyId.equals(row.id) &
+                  tbl.status.isIn([
+                    'created',
+                    'submitting',
+                    'new',
+                    'partiallyFilled',
+                    'cancelling',
+                  ]),
+            ))
+          .get();
+      final completed = await (db.select(db.orders)
+            ..where(
+              (tbl) =>
+                  tbl.strategyId.equals(row.id) &
+                  tbl.source.equals(source) &
+                  tbl.status.equals('filled'),
+            ))
+          .get();
+      final cancelled = await (db.select(db.orders)
+            ..where(
+              (tbl) =>
+                  tbl.strategyId.equals(row.id) &
+                  tbl.source.equals(source) &
+                  tbl.status.equals('cancelled'),
+            ))
+          .get();
+      final unknown = await (db.select(db.orders)
+            ..where(
+              (tbl) =>
+                  tbl.strategyId.equals(row.id) &
+                  tbl.source.equals(source) &
+                  tbl.status.equals('unknown'),
+            ))
+          .get();
+      final binanceActive = await (db.select(db.exchangeOpenOrders)
+            ..where(
+              (tbl) =>
+                  tbl.environment.equals('live') &
+                  tbl.marketType.equals('spot') &
+                  tbl.symbol.equals(row.symbol) &
+                  tbl.clientOrderId.like('$clientOrderPrefix%'),
+            ))
+          .get();
+      final lastReconcile = await (db.select(db.reconciliationRuns)
+            ..where((tbl) => tbl.summaryJson.like('%${row.id}%'))
+            ..orderBy([(tbl) => OrderingTerm.desc(tbl.startedAt)])
+            ..limit(1))
+          .getSingleOrNull();
       final strategyBtc = _d(row.strategySpotBtc);
       final unclassifiedBtc = inventory.unclassifiedBtc;
       const unprocessedFills = 0;
@@ -1917,8 +1996,7 @@ class AutoSpotGridExecutionService {
         blockingReasons.add('最近一次 REST 对账未成功');
       }
       final canMarkStopped = blockingReasons.isEmpty;
-      final isGhostCandidate =
-          [
+      final isGhostCandidate = [
             'running',
             'pausedKeepOrders',
             'pausedCancelOrders',
@@ -2017,26 +2095,28 @@ class AutoSpotGridExecutionService {
   Future<List<ExchangeOpenOrder>> strategyExchangeOpenOrders(
     String strategyId,
   ) async {
-    final localClientIds =
-        (await (db.select(db.orders)..where(
-              (tbl) =>
-                  tbl.strategyId.equals(strategyId) &
-                  tbl.clientOrderId.like('$clientOrderPrefix%'),
-            )).get())
-            .map((order) => order.clientOrderId)
-            .toSet();
-    final strategy =
-        await (db.select(db.strategies)
-          ..where((tbl) => tbl.id.equals(strategyId))).getSingleOrNull();
+    final localClientIds = (await (db.select(db.orders)
+              ..where(
+                (tbl) =>
+                    tbl.strategyId.equals(strategyId) &
+                    tbl.clientOrderId.like('$clientOrderPrefix%'),
+              ))
+            .get())
+        .map((order) => order.clientOrderId)
+        .toSet();
+    final strategy = await (db.select(db.strategies)
+          ..where((tbl) => tbl.id.equals(strategyId)))
+        .getSingleOrNull();
     final symbol = strategy?.symbol ?? 'BTCUSDT';
-    final exchange =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.environment.equals('live') &
-              tbl.marketType.equals('spot') &
-              tbl.symbol.equals(symbol) &
-              tbl.clientOrderId.like('$clientOrderPrefix%'),
-        )).get();
+    final exchange = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals('live') &
+                tbl.marketType.equals('spot') &
+                tbl.symbol.equals(symbol) &
+                tbl.clientOrderId.like('$clientOrderPrefix%'),
+          ))
+        .get();
     if (localClientIds.isEmpty) {
       return exchange;
     }
@@ -2062,13 +2142,14 @@ class AutoSpotGridExecutionService {
 
   Future<LiveSpotGridResetReport> resetForFreshStart() async {
     await liveExecution.refreshSpotSnapshot();
-    final exchangeOrders =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.environment.equals('live') &
-              tbl.marketType.equals('spot') &
-              tbl.symbol.equals('BTCUSDT'),
-        )).get();
+    final exchangeOrders = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals('live') &
+                tbl.marketType.equals('spot') &
+                tbl.symbol.equals('BTCUSDT'),
+          ))
+        .get();
     var cancelled = 0;
     var failed = 0;
     for (final order in exchangeOrders) {
@@ -2090,19 +2171,20 @@ class AutoSpotGridExecutionService {
       );
     }
 
-    final strategies =
-        await (db.select(db.strategies)
-          ..where((tbl) => tbl.environment.equals(environment))).get();
+    final strategies = await (db.select(db.strategies)
+          ..where((tbl) => tbl.environment.equals(environment)))
+        .get();
     final now = DateTime.now().toUtc();
     var disabledGridLevels = 0;
     await db.transaction(() async {
       for (final strategy in strategies) {
-        final levels =
-            await (db.select(db.gridLevels)
-              ..where((tbl) => tbl.strategyId.equals(strategy.id))).get();
+        final levels = await (db.select(db.gridLevels)
+              ..where((tbl) => tbl.strategyId.equals(strategy.id)))
+            .get();
         disabledGridLevels += levels.length;
         await (db.update(db.gridLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategy.id))).write(
+              ..where((tbl) => tbl.strategyId.equals(strategy.id)))
+            .write(
           GridLevelsCompanion(
             status: const Value('disabled'),
             lifecycleStatus: const Value('paused'),
@@ -2111,7 +2193,8 @@ class AutoSpotGridExecutionService {
           ),
         );
         await (db.update(db.strategies)
-          ..where((tbl) => tbl.id.equals(strategy.id))).write(
+              ..where((tbl) => tbl.id.equals(strategy.id)))
+            .write(
           StrategiesCompanion(
             status: const Value('archived'),
             stoppedAt: Value(now),
@@ -2132,13 +2215,14 @@ class AutoSpotGridExecutionService {
   Stream<List<ExchangeOpenOrder>> watchLiveSpotGridExchangeOpenOrders({
     required String symbol,
   }) {
-    final query = db.select(db.exchangeOpenOrders)..where(
-      (tbl) =>
-          tbl.environment.equals('live') &
-          tbl.marketType.equals('spot') &
-          tbl.symbol.equals(symbol.toUpperCase()) &
-          tbl.clientOrderId.like('$clientOrderPrefix%'),
-    );
+    final query = db.select(db.exchangeOpenOrders)
+      ..where(
+        (tbl) =>
+            tbl.environment.equals('live') &
+            tbl.marketType.equals('spot') &
+            tbl.symbol.equals(symbol.toUpperCase()) &
+            tbl.clientOrderId.like('$clientOrderPrefix%'),
+      );
     query.orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]);
     return query.watch();
   }
@@ -2146,18 +2230,19 @@ class AutoSpotGridExecutionService {
   Future<LiveSpotGridReplacementPreview> previewReplacementOrder(
     String parentOrderId,
   ) async {
-    final parent =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(parentOrderId))).getSingleOrNull();
+    final parent = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(parentOrderId)))
+        .getSingleOrNull();
     if (parent == null) {
       throw StateError('父订单不存在: $parentOrderId');
     }
-    final grid =
-        parent.gridLevelId == null
-            ? null
-            : await (db.select(db.gridLevels)..where(
-              (tbl) => tbl.id.equals(parent.gridLevelId!),
-            )).getSingleOrNull();
+    final grid = parent.gridLevelId == null
+        ? null
+        : await (db.select(db.gridLevels)
+              ..where(
+                (tbl) => tbl.id.equals(parent.gridLevelId!),
+              ))
+            .getSingleOrNull();
     if (grid == null) {
       throw StateError('父订单没有关联网格，无法补单。');
     }
@@ -2183,23 +2268,21 @@ class AutoSpotGridExecutionService {
       rules: rules,
     );
     final duplicate = await _hasActiveOrderForGrid(grid.id);
-    final acceptable =
-        rules == null
-            ? quantity > Decimal.zero
-            : rules.isAcceptableOrder(price: price, quantity: quantity);
+    final acceptable = rules == null
+        ? quantity > Decimal.zero
+        : rules.isAcceptableOrder(price: price, quantity: quantity);
     final existingIsLocalOnly =
         existing != null && _isLocalOnlyReplacementCandidate(existing);
     final ticker = marketData.latestSpotTicker;
-    final reason =
-        existingIsLocalOnly
-            ? '已存在本地反向订单但未提交 Binance，确认后将按当前可用余额校正数量并沿用该 clientOrderId 提交。'
-            : existing != null
+    final reason = existingIsLocalOnly
+        ? '已存在本地反向订单但未提交 Binance，确认后将按当前可用余额校正数量并沿用该 clientOrderId 提交。'
+        : existing != null
             ? '已存在 Binance 反向订单，将直接关联，不会重复补单。'
             : duplicate
-            ? '已存在同方向同价格活动订单，禁止重复补单。'
-            : acceptable
-            ? '满足补单条件。'
-            : '数量或金额不满足 minQty/minNotional。';
+                ? '已存在同方向同价格活动订单，禁止重复补单。'
+                : acceptable
+                    ? '满足补单条件。'
+                    : '数量或金额不满足 minQty/minNotional。';
     return LiveSpotGridReplacementPreview(
       parentOrder: parent,
       replacementSide: replacementSide,
@@ -2222,17 +2305,17 @@ class AutoSpotGridExecutionService {
   }
 
   Future<String> createReplacementForOrder(String parentOrderId) async {
-    final parent =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(parentOrderId))).getSingleOrNull();
+    final parent = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(parentOrderId)))
+        .getSingleOrNull();
     if (parent == null) {
       throw StateError('父订单不存在: $parentOrderId');
     }
     await liveExecution.refreshSpotSnapshotForSymbol(parent.symbol);
     await _syncExchangeState(parent.strategyId);
-    final refreshed =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(parentOrderId))).getSingleOrNull();
+    final refreshed = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(parentOrderId)))
+        .getSingleOrNull();
     if (refreshed == null) {
       throw StateError('父订单不存在: $parentOrderId');
     }
@@ -2260,7 +2343,8 @@ class AutoSpotGridExecutionService {
     final oldExternal = _d(strategy.externalSpotBtc);
     await db.transaction(() async {
       await (db.update(db.strategies)
-        ..where((tbl) => tbl.id.equals(strategyId))).write(
+            ..where((tbl) => tbl.id.equals(strategyId)))
+          .write(
         StrategiesCompanion(
           strategySpotBtc: const Value('0'),
           externalSpotBtc: Value(_s(oldExternal + strategyBtc)),
@@ -2269,7 +2353,8 @@ class AutoSpotGridExecutionService {
       );
       if (snapshot != null) {
         await (db.update(db.spotAccountSnapshots)
-          ..where((tbl) => tbl.id.equals(snapshot.id))).write(
+              ..where((tbl) => tbl.id.equals(snapshot.id)))
+            .write(
           SpotAccountSnapshotsCompanion(
             strategyTrackedBtc: const Value('0'),
             externalBtc: Value(_s(_d(snapshot.externalBtc) + strategyBtc)),
@@ -2277,9 +2362,7 @@ class AutoSpotGridExecutionService {
           ),
         );
       }
-      await db
-          .into(db.assetClassificationEvents)
-          .insert(
+      await db.into(db.assetClassificationEvents).insert(
             AssetClassificationEventsCompanion.insert(
               id: _uuid.v4(),
               asset: 'BTC',
@@ -2301,11 +2384,10 @@ class AutoSpotGridExecutionService {
   Future<LiveSpotGridPreflightResult> preflight(String strategyId) async {
     await _setStatus(strategyId, 'validating');
     final issues = await preflightIssues(strategyId);
-    final failures =
-        issues
-            .where((issue) => issue.failed)
-            .map((issue) => issue.message)
-            .toList();
+    final failures = issues
+        .where((issue) => issue.failed)
+        .map((issue) => issue.message)
+        .toList();
     if (failures.isEmpty) {
       await _setStatus(strategyId, 'previewReady');
     } else {
@@ -2351,66 +2433,66 @@ class AutoSpotGridExecutionService {
       marketData.status.overallStatus == MarketConnectionStatus.ready &&
               ticker != null
           ? LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.marketData,
-            title: '公共行情',
-            status: 'passed',
-            message: '$symbol 现货行情正常。',
-          )
+              type: LiveSpotGridPreflightIssueType.marketData,
+              title: '公共行情',
+              status: 'passed',
+              message: '$symbol 现货行情正常。',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.marketData,
-            title: '公共行情',
-            status: 'failed',
-            message: '公共行情未就绪',
-            details: {
-              'overallStatus': marketData.status.overallStatus.name,
-              'spotTicker': ticker == null ? 'missing' : 'available',
-            },
-          ),
+              type: LiveSpotGridPreflightIssueType.marketData,
+              title: '公共行情',
+              status: 'failed',
+              message: '公共行情未就绪',
+              details: {
+                'overallStatus': marketData.status.overallStatus.name,
+                'spotTicker': ticker == null ? 'missing' : 'available',
+              },
+            ),
     );
 
     final snapshot = await _latestSpotSnapshot();
     addIssue(
       snapshot == null
           ? const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.spotRest,
-            title: '现货REST',
-            status: 'failed',
-            message: '缺少现货账户快照，请先连接或刷新账户。',
-            actionLabel: 'REST对账',
-          )
+              type: LiveSpotGridPreflightIssueType.spotRest,
+              title: '现货REST',
+              status: 'failed',
+              message: '缺少现货账户快照，请先连接或刷新账户。',
+              actionLabel: 'REST对账',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.spotRest,
-            title: '现货REST',
-            status: 'passed',
-            message: '最近快照：${snapshot.recordedAt.toLocal()}',
-          ),
+              type: LiveSpotGridPreflightIssueType.spotRest,
+              title: '现货REST',
+              status: 'passed',
+              message: '最近快照：${snapshot.recordedAt.toLocal()}',
+            ),
     );
 
     addIssue(
       snapshot == null
           ? const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.spotAccountWs,
-            title: '现货账户WS',
-            status: 'blocked',
-            message: '现货REST未就绪，暂不判断账户WS。',
-          )
+              type: LiveSpotGridPreflightIssueType.spotAccountWs,
+              title: '现货账户WS',
+              status: 'blocked',
+              message: '现货REST未就绪，暂不判断账户WS。',
+            )
           : const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.spotAccountWs,
-            title: '现货账户WS',
-            status: 'passed',
-            message: '账户事件状态由只读连接维护，当前已有账户快照。',
-          ),
+              type: LiveSpotGridPreflightIssueType.spotAccountWs,
+              title: '现货账户WS',
+              status: 'passed',
+              message: '账户事件状态由只读连接维护，当前已有账户快照。',
+            ),
     );
 
     addIssue(
       blocked
           ? blockedIssue(LiveSpotGridPreflightIssueType.serverTime, '服务器时间')
           : const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.serverTime,
-            title: '服务器时间',
-            status: 'passed',
-            message: '签名请求会使用已校准时间服务。',
-          ),
+              type: LiveSpotGridPreflightIssueType.serverTime,
+              title: '服务器时间',
+              status: 'passed',
+              message: '签名请求会使用已校准时间服务。',
+            ),
     );
 
     if (blocked) {
@@ -2427,23 +2509,22 @@ class AutoSpotGridExecutionService {
       addIssue(
         liveExecution.spotRulesForSymbol(symbol) == null
             ? LiveSpotGridPreflightIssue(
-              type: LiveSpotGridPreflightIssueType.exchangeRules,
-              title: '交易规则',
-              status: 'failed',
-              message: '$symbol 正式现货交易规则未加载。',
-              actionLabel: '加载交易规则',
-              details: _rulesDetails(diagnostics),
-            )
+                type: LiveSpotGridPreflightIssueType.exchangeRules,
+                title: '交易规则',
+                status: 'failed',
+                message: '$symbol 正式现货交易规则未加载。',
+                actionLabel: '加载交易规则',
+                details: _rulesDetails(diagnostics),
+              )
             : LiveSpotGridPreflightIssue(
-              type: LiveSpotGridPreflightIssueType.exchangeRules,
-              title: '交易规则',
-              status: 'passed',
-              message:
-                  diagnostics.usingCache
-                      ? '已加载 $symbol 规则，当前使用缓存。'
-                      : '已加载 $symbol 规则。',
-              details: _rulesDetails(diagnostics),
-            ),
+                type: LiveSpotGridPreflightIssueType.exchangeRules,
+                title: '交易规则',
+                status: 'passed',
+                message: diagnostics.usingCache
+                    ? '已加载 $symbol 规则，当前使用缓存。'
+                    : '已加载 $symbol 规则。',
+                details: _rulesDetails(diagnostics),
+              ),
       );
     }
 
@@ -2451,9 +2532,7 @@ class AutoSpotGridExecutionService {
       addIssue(blockedIssue(LiveSpotGridPreflightIssueType.sqlite, 'SQLite'));
     } else {
       try {
-        await db
-            .into(db.appSettings)
-            .insertOnConflictUpdate(
+        await db.into(db.appSettings).insertOnConflictUpdate(
               AppSettingsCompanion.insert(
                 key: 'live_grid_preflight_write_test',
                 value: DateTime.now().toUtc().toIso8601String(),
@@ -2481,122 +2560,119 @@ class AutoSpotGridExecutionService {
     }
 
     final conflicts = await conflictingLiveStrategies(strategyId);
-    final blockingConflicts =
-        conflicts
-            .where(
-              (item) =>
-                  _conflictingStatuses.contains(item.status) ||
-                  !item.canMarkStopped,
-            )
-            .toList();
+    final blockingConflicts = conflicts
+        .where(
+          (item) =>
+              _conflictingStatuses.contains(item.status) ||
+              !item.canMarkStopped,
+        )
+        .toList();
     final safeResidualConflicts =
         conflicts.where((item) => !blockingConflicts.contains(item)).toList();
     addIssue(
       blockingConflicts.isEmpty
           ? const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.conflictingStrategy,
-            title: '冲突策略',
-            status: 'passed',
-            message: '没有阻止启动的活跃 LIVE 现货网格。',
-          )
+              type: LiveSpotGridPreflightIssueType.conflictingStrategy,
+              title: '冲突策略',
+              status: 'passed',
+              message: '没有阻止启动的活跃 LIVE 现货网格。',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.conflictingStrategy,
-            title: '冲突策略',
-            status: 'failed',
-            message:
-                '找到 ${blockingConflicts.length} 条需要处理的旧 LIVE 现货网格。'
-                '${safeResidualConflicts.isEmpty ? '' : ' 另有 ${safeResidualConflicts.length} 条可安全清理的残留策略。'}',
-            actionLabel: '查看冲突策略',
-            details: {
-              'strategies':
-                  blockingConflicts
+              type: LiveSpotGridPreflightIssueType.conflictingStrategy,
+              title: '冲突策略',
+              status: 'failed',
+              message: '找到 ${blockingConflicts.length} 条需要处理的旧 LIVE 现货网格。'
+                  '${safeResidualConflicts.isEmpty ? '' : ' 另有 ${safeResidualConflicts.length} 条可安全清理的残留策略。'}',
+              actionLabel: '查看冲突策略',
+              details: {
+                'strategies': blockingConflicts
+                    .map(
+                      (item) => {
+                        'strategyId': item.strategyId,
+                        'symbol': item.symbol,
+                        'status': item.status,
+                        'createdAt': item.createdAt.toIso8601String(),
+                        'startedAt': item.startedAt?.toIso8601String(),
+                        'localActiveOrders': item.localActiveOrders,
+                        'binanceActiveOrders': item.binanceActiveOrders,
+                        'strategy${item.baseAsset}':
+                            item.strategyBtc.toString(),
+                        'lastReconcileAt':
+                            item.lastReconcileAt?.toIso8601String(),
+                        'blockingReasons': item.blockingReasons,
+                      },
+                    )
+                    .toList(),
+                if (safeResidualConflicts.isNotEmpty)
+                  'safeResidualStrategies': safeResidualConflicts
                       .map(
                         (item) => {
                           'strategyId': item.strategyId,
-                          'symbol': item.symbol,
                           'status': item.status,
-                          'createdAt': item.createdAt.toIso8601String(),
-                          'startedAt': item.startedAt?.toIso8601String(),
-                          'localActiveOrders': item.localActiveOrders,
-                          'binanceActiveOrders': item.binanceActiveOrders,
-                          'strategy${item.baseAsset}':
-                              item.strategyBtc.toString(),
-                          'lastReconcileAt':
-                              item.lastReconcileAt?.toIso8601String(),
-                          'blockingReasons': item.blockingReasons,
                         },
                       )
                       .toList(),
-              if (safeResidualConflicts.isNotEmpty)
-                'safeResidualStrategies':
-                    safeResidualConflicts
-                        .map(
-                          (item) => {
-                            'strategyId': item.strategyId,
-                            'status': item.status,
-                          },
-                        )
-                        .toList(),
-            },
-          ),
+              },
+            ),
     );
 
-    final exchangeOpen =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.environment.equals('live') &
-              tbl.marketType.equals('spot') &
-              tbl.symbol.equals(symbol),
-        )).get();
-    final unknownOpen =
-        exchangeOpen
-            .where(
-              (order) => !order.clientOrderId.startsWith(clientOrderPrefix),
-            )
-            .toList();
+    final exchangeOpen = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals('live') &
+                tbl.marketType.equals('spot') &
+                tbl.symbol.equals(symbol),
+          ))
+        .get();
+    final unknownOpen = exchangeOpen
+        .where(
+          (order) => !order.clientOrderId.startsWith(clientOrderPrefix),
+        )
+        .toList();
     addIssue(
       unknownOpen.isEmpty
           ? LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.unknownOrders,
-            title: 'Binance未知订单',
-            status: 'passed',
-            message: '没有非本程序 $symbol 现货挂单。',
-          )
+              type: LiveSpotGridPreflightIssueType.unknownOrders,
+              title: 'Binance未知订单',
+              status: 'passed',
+              message: '没有非本程序 $symbol 现货挂单。',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.unknownOrders,
-            title: 'Binance未知订单',
-            status: 'failed',
-            message: '存在 ${unknownOpen.length} 笔非本 LIVE 网格 $symbol 挂单。',
-            actionLabel: 'REST对账',
-          ),
+              type: LiveSpotGridPreflightIssueType.unknownOrders,
+              title: 'Binance未知订单',
+              status: 'failed',
+              message: '存在 ${unknownOpen.length} 笔非本 LIVE 网格 $symbol 挂单。',
+              actionLabel: 'REST对账',
+            ),
     );
 
     final inventory = await loadBtcInventory(strategyId);
     addIssue(
       inventory.unclassifiedBtc <= Decimal.zero
           ? LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.btcClassification,
-            title: '$baseAsset归属',
-            status: 'passed',
-            message: '没有未分类 $baseAsset。',
-          )
+              type: LiveSpotGridPreflightIssueType.btcClassification,
+              title: '$baseAsset归属',
+              status: 'passed',
+              message: '没有未分类 $baseAsset。',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.btcClassification,
-            title: '$baseAsset归属',
-            status: 'failed',
-            message:
-                '未分类$baseAsset=${inventory.unclassifiedBtc}，禁止自动认定为策略 $baseAsset。',
-            actionLabel: '处理$baseAsset归属',
-            details: {
-              'accountTotal$baseAsset': inventory.accountTotalBtc.toString(),
-              'currentStrategy$baseAsset': inventory.strategyBtc.toString(),
-              'otherStrategy$baseAsset': inventory.otherStrategyBtc.toString(),
-              'external$baseAsset': inventory.externalBtc.toString(),
-              'unclassified$baseAsset': inventory.unclassifiedBtc.toString(),
-              'locked$baseAsset': inventory.btcLocked.toString(),
-              'available$baseAsset': inventory.btcFree.toString(),
-            },
-          ),
+              type: LiveSpotGridPreflightIssueType.btcClassification,
+              title: '$baseAsset归属',
+              status: 'failed',
+              message:
+                  '未分类$baseAsset=${inventory.unclassifiedBtc}，禁止自动认定为策略 $baseAsset。',
+              actionLabel: '处理$baseAsset归属',
+              details: {
+                'accountTotal$baseAsset': inventory.accountTotalBtc.toString(),
+                'currentStrategy$baseAsset': inventory.strategyBtc.toString(),
+                'otherStrategy$baseAsset':
+                    inventory.otherStrategyBtc.toString(),
+                'external$baseAsset': inventory.externalBtc.toString(),
+                'unclassified$baseAsset': inventory.unclassifiedBtc.toString(),
+                'locked$baseAsset': inventory.btcLocked.toString(),
+                'available$baseAsset': inventory.btcFree.toString(),
+              },
+            ),
     );
 
     final report = await dryRun(strategyId, skipStatusUpdate: true);
@@ -2605,63 +2681,62 @@ class AutoSpotGridExecutionService {
     addIssue(
       usdtFailures.isEmpty
           ? LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.usdtBalance,
-            title: 'USDT余额',
-            status: 'passed',
-            message: '可用USDT=${report.availableUsdt}',
-          )
+              type: LiveSpotGridPreflightIssueType.usdtBalance,
+              title: 'USDT余额',
+              status: 'passed',
+              message: '可用USDT=${report.availableUsdt}',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.usdtBalance,
-            title: 'USDT余额',
-            status: 'failed',
-            message: usdtFailures.join('; '),
-          ),
+              type: LiveSpotGridPreflightIssueType.usdtBalance,
+              title: 'USDT余额',
+              status: 'failed',
+              message: usdtFailures.join('; '),
+            ),
     );
 
-    final gridFailures =
-        report.failures
-            .where(
-              (failure) =>
-                  !failure.contains('USDT') &&
-                  !failure.contains('未分类 $baseAsset') &&
-                  !failure.contains('缺少现货交易规则') &&
-                  !failure.contains('公共行情') &&
-                  !failure.contains('现货账户快照') &&
-                  !failure.contains('其他 LIVE'),
-            )
-            .toList();
+    final gridFailures = report.failures
+        .where(
+          (failure) =>
+              !failure.contains('USDT') &&
+              !failure.contains('未分类 $baseAsset') &&
+              !failure.contains('缺少现货交易规则') &&
+              !failure.contains('公共行情') &&
+              !failure.contains('现货账户快照') &&
+              !failure.contains('其他 LIVE'),
+        )
+        .toList();
     addIssue(
       gridFailures.isEmpty
           ? LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.gridAndCapital,
-            title: '网格数量和资金',
-            status: 'passed',
-            message:
-                '首次订单=${report.initialActiveOrderCount}，最大挂单=${report.maxOpenOrders}。',
-          )
+              type: LiveSpotGridPreflightIssueType.gridAndCapital,
+              title: '网格数量和资金',
+              status: 'passed',
+              message:
+                  '首次订单=${report.initialActiveOrderCount}，最大挂单=${report.maxOpenOrders}。',
+            )
           : LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.gridAndCapital,
-            title: '网格数量和资金',
-            status: 'failed',
-            message: gridFailures.join('; '),
-          ),
+              type: LiveSpotGridPreflightIssueType.gridAndCapital,
+              title: '网格数量和资金',
+              status: 'failed',
+              message: gridFailures.join('; '),
+            ),
     );
 
     addIssue(
       liveTradingGate.liveTradingEnabled.value
           ? const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.liveTrading,
-            title: 'LIVE写操作',
-            status: 'passed',
-            message: '真实写操作已开启。',
-          )
+              type: LiveSpotGridPreflightIssueType.liveTrading,
+              title: 'LIVE写操作',
+              status: 'passed',
+              message: '真实写操作已开启。',
+            )
           : const LiveSpotGridPreflightIssue(
-            type: LiveSpotGridPreflightIssueType.liveTrading,
-            title: 'LIVE写操作',
-            status: 'failed',
-            message: '真实写操作未开启',
-            actionLabel: '前往开启LIVE写操作',
-          ),
+              type: LiveSpotGridPreflightIssueType.liveTrading,
+              title: 'LIVE写操作',
+              status: 'failed',
+              message: '真实写操作未开启',
+              actionLabel: '前往开启LIVE写操作',
+            ),
     );
 
     return issues;
@@ -2731,42 +2806,42 @@ class AutoSpotGridExecutionService {
       if (_d(strategy.upperPrice) - dryRunCurrent < dryRunCurrent * spacing) {
         failures.add('当前价格距离上限不足一格');
       }
-      final otherRunning =
-          await (db.select(db.strategies)..where(
-            (tbl) =>
-                tbl.environment.equals(environment) &
-                tbl.symbol.equals(strategy.symbol) &
-                tbl.id.equals(strategy.id).not() &
-                tbl.status.isIn(_conflictingStatuses),
-          )).get();
+      final otherRunning = await (db.select(db.strategies)
+            ..where(
+              (tbl) =>
+                  tbl.environment.equals(environment) &
+                  tbl.symbol.equals(strategy.symbol) &
+                  tbl.id.equals(strategy.id).not() &
+                  tbl.status.isIn(_conflictingStatuses),
+            ))
+          .get();
       if (otherRunning.isNotEmpty) {
         failures.add('已有其他 LIVE 现货网格处于运行、暂停或对账状态');
       }
 
-      final exchangeOpen =
-          await (db.select(db.exchangeOpenOrders)..where(
-            (tbl) =>
-                tbl.environment.equals('live') &
-                tbl.marketType.equals('spot') &
-                tbl.symbol.equals(strategy.symbol),
-          )).get();
+      final exchangeOpen = await (db.select(db.exchangeOpenOrders)
+            ..where(
+              (tbl) =>
+                  tbl.environment.equals('live') &
+                  tbl.marketType.equals('spot') &
+                  tbl.symbol.equals(strategy.symbol),
+            ))
+          .get();
       exchangeOpenOrderCount = exchangeOpen.length;
-      unknownOpenOrderCount =
-          exchangeOpen
-              .where(
-                (order) => !order.clientOrderId.startsWith(clientOrderPrefix),
-              )
-              .length;
+      unknownOpenOrderCount = exchangeOpen
+          .where(
+            (order) => !order.clientOrderId.startsWith(clientOrderPrefix),
+          )
+          .length;
       if (unknownOpenOrderCount > 0) {
         failures.add('存在非本 LIVE 网格 ${strategy.symbol} 挂单');
       }
 
-      initialBtcRequired =
-          ticker == null
-              ? Decimal.zero
-              : ((_d(strategy.spotCapital) * Decimal.parse('0.5')) /
-                      ticker.askPrice)
-                  .toDecimal(scaleOnInfinitePrecision: 12);
+      initialBtcRequired = ticker == null
+          ? Decimal.zero
+          : ((_d(strategy.spotCapital) * Decimal.parse('0.5')) /
+                  ticker.askPrice)
+              .toDecimal(scaleOnInfinitePrecision: 12);
 
       final gridLevels = await _levels(strategyId);
       final initialCandidates = _initialBuyOrderCandidates(
@@ -2777,14 +2852,12 @@ class AutoSpotGridExecutionService {
       for (final level in gridLevels) {
         final buyPrice = _gridBuyPrice(level);
         final sellPrice = _gridSellPrice(level);
-        final price =
-            rules == null
-                ? (buyPrice ?? _d(level.price))
-                : rules.quantizePrice(buyPrice ?? _d(level.price));
-        final quantity =
-            rules == null
-                ? _d(level.plannedQuantity)
-                : rules.quantizeQuantity(_d(level.plannedQuantity));
+        final price = rules == null
+            ? (buyPrice ?? _d(level.price))
+            : rules.quantizePrice(buyPrice ?? _d(level.price));
+        final quantity = rules == null
+            ? _d(level.plannedQuantity)
+            : rules.quantizeQuantity(_d(level.plannedQuantity));
         final notional = price * quantity;
         var valid = true;
         final reasons = <String>[];
@@ -2836,14 +2909,12 @@ class AutoSpotGridExecutionService {
       }
     }
 
-    final availableBtc =
-        baseAsset == 'BTC'
-            ? (snapshot == null ? Decimal.zero : _d(snapshot.btcFree))
-            : _assetFree(baseAssetRow);
-    final availableUsdt =
-        quoteAssetRow == null
-            ? (snapshot == null ? Decimal.zero : _d(snapshot.usdtFree))
-            : _assetFree(quoteAssetRow);
+    final availableBtc = baseAsset == 'BTC'
+        ? (snapshot == null ? Decimal.zero : _d(snapshot.btcFree))
+        : _assetFree(baseAssetRow);
+    final availableUsdt = quoteAssetRow == null
+        ? (snapshot == null ? Decimal.zero : _d(snapshot.usdtFree))
+        : _assetFree(quoteAssetRow);
     final externalBtc =
         strategy == null ? Decimal.zero : _d(strategy.externalSpotBtc);
     final inventory =
@@ -2968,12 +3039,7 @@ class AutoSpotGridExecutionService {
         if (activeCount >= config.maxOpenOrders) break;
         if (!initialCandidates.contains(level.id)) continue;
         final buyPrice = _gridBuyPrice(level);
-        if (buyPrice == null ||
-            !_isFuturesLongBuyTriggerReached(
-              buyPrice: buyPrice,
-              currentPrice: current,
-              triggerDistance: config.longEntryTriggerDistanceUsdt,
-            )) {
+        if (buyPrice == null) {
           continue;
         }
         try {
@@ -2990,15 +3056,14 @@ class AutoSpotGridExecutionService {
       }
 
       final refreshed = await _levels(strategyId);
-      final waiting =
-          refreshed
-              .where(
-                (level) =>
-                    _gridBuyPrice(level) != null &&
-                    _gridBuyPrice(level)! < current &&
-                    _isWaitingLongBuyLevel(level),
-              )
-              .length;
+      final waiting = refreshed
+          .where(
+            (level) =>
+                _gridBuyPrice(level) != null &&
+                _gridBuyPrice(level)! < current &&
+                _isWaitingLongBuyLevel(level),
+          )
+          .length;
       final refreshedActive = _activeLongGridOrderCount(refreshed);
       if (failures.isEmpty) {
         await _setStatus(strategyId, 'running');
@@ -3048,22 +3113,23 @@ class AutoSpotGridExecutionService {
     final now = DateTime.now().toUtc();
     await _setStatus(strategyId, 'stopping');
 
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(futuresLongSource) &
-              tbl.marketType.equals('usdtFutures') &
-              tbl.side.equals('BUY') &
-              tbl.purpose.equals('futuresLongGridBuy') &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-                'unknown',
-              ]),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(futuresLongSource) &
+                tbl.marketType.equals('usdtFutures') &
+                tbl.side.equals('BUY') &
+                tbl.purpose.equals('futuresLongGridBuy') &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                  'unknown',
+                ]),
+          ))
+        .get();
     var cancelled = 0;
     var partialFilled = 0;
     var resetLevels = 0;
@@ -3092,8 +3158,8 @@ class AutoSpotGridExecutionService {
         }
       } catch (error) {
         failures.add('${order.price ?? order.clientOrderId}: $error');
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             status: const Value('unknown'),
             updatedAt: Value(DateTime.now().toUtc()),
@@ -3163,10 +3229,9 @@ class AutoSpotGridExecutionService {
       strategy.symbol,
       includeHistory: false,
     );
-    final quantity =
-        normalizedSide == 'LONG'
-            ? await liveExecution.currentFuturesLongQuantity(strategy.symbol)
-            : await liveExecution.currentFuturesShortQuantity(strategy.symbol);
+    final quantity = normalizedSide == 'LONG'
+        ? await liveExecution.currentFuturesLongQuantity(strategy.symbol)
+        : await liveExecution.currentFuturesShortQuantity(strategy.symbol);
     if (quantity <= Decimal.zero) {
       return FuturesPositionCloseReport(
         strategyId: strategyId,
@@ -3184,10 +3249,9 @@ class AutoSpotGridExecutionService {
       positionSide: normalizedSide,
       strategyId: strategyId,
       source: normalizedSide == 'LONG' ? futuresLongSource : 'autoHedge',
-      purpose:
-          normalizedSide == 'LONG'
-              ? 'manualCloseFuturesLong'
-              : 'manualCloseFuturesShort',
+      purpose: normalizedSide == 'LONG'
+          ? 'manualCloseFuturesLong'
+          : 'manualCloseFuturesShort',
     );
     await liveExecution.refreshFuturesSnapshotForSymbol(
       strategy.symbol,
@@ -3210,9 +3274,9 @@ class AutoSpotGridExecutionService {
   }
 
   Future<String> submitWaitingFuturesLongGridLevel(String gridLevelId) async {
-    var level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    var level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3228,9 +3292,9 @@ class AutoSpotGridExecutionService {
       if (!repaired) {
         throw StateError('该价格层当前不是等待开多状态，不能挂 LONG BUY。');
       }
-      level =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+      level = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(gridLevelId)))
+          .getSingleOrNull();
       if (level == null || !_isWaitingLongBuyLevel(level)) {
         throw StateError('该价格层数据库状态恢复失败，不能挂 LONG BUY。');
       }
@@ -3253,9 +3317,9 @@ class AutoSpotGridExecutionService {
     String gridLevelId, {
     bool verifyAvailableQuantity = true,
   }) async {
-    var level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    var level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3269,9 +3333,9 @@ class AutoSpotGridExecutionService {
     var status = level.lifecycleStatus ?? level.status;
     if (status != 'buyFilled') {
       await _recomputeFuturesLongGridLifecycle(strategy.id);
-      level =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+      level = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.id.equals(gridLevelId)))
+          .getSingleOrNull();
       if (level == null) {
         throw StateError('网格不存在: $gridLevelId');
       }
@@ -3316,10 +3380,9 @@ class AutoSpotGridExecutionService {
           '请先处理已有 reduceOnly 平多挂单或刷新 Binance 对账。',
         );
       }
-      quantity =
-          desiredQuantity < availableQuantity
-              ? desiredQuantity
-              : availableQuantity;
+      quantity = desiredQuantity < availableQuantity
+          ? desiredQuantity
+          : availableQuantity;
     }
     final config = await loadEditableConfig(strategy.id);
     await liveExecution.ensureFuturesHedgeMode(
@@ -3340,16 +3403,15 @@ class AutoSpotGridExecutionService {
       source: futuresLongSource,
       purpose: 'futuresLongGridSell',
     );
-    final created =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(orderId))).getSingleOrNull();
+    final created = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(orderId)))
+        .getSingleOrNull();
     final gridStatus = _gridStatusAfterSubmit(
       side: 'SELL',
       order: created,
       submittingStatus: 'sellSubmitting',
     );
-    final activeOrder =
-        created != null &&
+    final activeOrder = created != null &&
         [
           'created',
           'submitting',
@@ -3357,8 +3419,8 @@ class AutoSpotGridExecutionService {
           'partiallyFilled',
           'unknown',
         ].contains(created.status);
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(gridLevelId))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(gridLevelId)))
+        .write(
       GridLevelsCompanion(
         status: Value(gridStatus),
         lifecycleStatus: Value(gridStatus),
@@ -3382,9 +3444,9 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> renewFuturesLongGridLevel(String gridLevelId) async {
-    final level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    final level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3395,12 +3457,13 @@ class AutoSpotGridExecutionService {
     if (strategy.environment != futuresGridEnvironment) {
       throw StateError('当前策略不是 LIVE 合约 LONG 网格策略。');
     }
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.gridLevelId.equals(level.id) &
-              tbl.source.equals(futuresLongSource),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(level.id) &
+                tbl.source.equals(futuresLongSource),
+          ))
+        .get();
     final activeRows = orders
         .where(
           (order) =>
@@ -3414,8 +3477,8 @@ class AutoSpotGridExecutionService {
     final now = DateTime.now().toUtc();
     await db.transaction(() async {
       for (final order in activeRows) {
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             status: const Value('cancelled'),
             cancelledAt: Value(now),
@@ -3425,8 +3488,8 @@ class AutoSpotGridExecutionService {
         );
       }
       await _markFuturesLongBuyOrdersReleasedNoPosition(orders, updatedAt: now);
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('waitingBuy'),
           lifecycleStatus: const Value('waitingBuy'),
@@ -3453,8 +3516,8 @@ class AutoSpotGridExecutionService {
     required String reason,
   }) async {
     final now = DateTime.now().toUtc();
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: const Value('waitingBuy'),
         lifecycleStatus: const Value('waitingBuy'),
@@ -3476,9 +3539,9 @@ class AutoSpotGridExecutionService {
   }
 
   Future<String> closeFuturesLongGridLevelPosition(String gridLevelId) async {
-    var level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    var level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3490,9 +3553,9 @@ class AutoSpotGridExecutionService {
       throw StateError('当前策略不是 LIVE 合约 LONG 网格策略。');
     }
     await _recomputeFuturesLongGridLifecycle(strategy.id);
-    level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3527,10 +3590,9 @@ class AutoSpotGridExecutionService {
         '请先处理已有 reduceOnly 平多挂单或刷新 Binance 对账。',
       );
     }
-    final quantity =
-        desiredQuantity < availability.available
-            ? desiredQuantity
-            : availability.available;
+    final quantity = desiredQuantity < availability.available
+        ? desiredQuantity
+        : availability.available;
     final config = await loadEditableConfig(strategy.id);
     await liveExecution.ensureFuturesHedgeMode(strategy.symbol);
     await liveExecution.ensureFuturesRules(symbol: strategy.symbol);
@@ -3546,9 +3608,9 @@ class AutoSpotGridExecutionService {
       source: futuresLongSource,
       purpose: 'futuresLongGridSell',
     );
-    final created =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(orderId))).getSingleOrNull();
+    final created = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(orderId)))
+        .getSingleOrNull();
     if (_isFailedFuturesLongSubmission(created)) {
       throw StateError(_futuresLongSubmissionError(created));
     }
@@ -3560,9 +3622,9 @@ class AutoSpotGridExecutionService {
   }
 
   Future<int> cancelFuturesLongGridLevelOpenOrders(String gridLevelId) async {
-    final level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    final level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3595,8 +3657,8 @@ class AutoSpotGridExecutionService {
           rethrow;
         }
         final now = DateTime.now().toUtc();
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             status: const Value('cancelled'),
             cancelledAt: Value(now),
@@ -3618,8 +3680,8 @@ class AutoSpotGridExecutionService {
     required String lastSellOrderId,
   }) async {
     final now = DateTime.now().toUtc();
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: const Value('waitingBuy'),
         lifecycleStatus: const Value('waitingBuy'),
@@ -3637,8 +3699,8 @@ class AutoSpotGridExecutionService {
     required String reason,
   }) async {
     final now = DateTime.now().toUtc();
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: const Value('waitingBuy'),
         lifecycleStatus: const Value('waitingBuy'),
@@ -3667,12 +3729,13 @@ class AutoSpotGridExecutionService {
     if (strategy.environment != futuresGridEnvironment) {
       throw StateError('当前策略不是 LIVE 合约 LONG 网格策略。');
     }
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(futuresLongSource),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(futuresLongSource),
+          ))
+        .get();
     final repairable = orders
         .where(
           (order) =>
@@ -3721,7 +3784,8 @@ class AutoSpotGridExecutionService {
         )) {
           if (_isActiveOrder(order)) {
             await (db.update(db.orders)
-              ..where((tbl) => tbl.id.equals(order.id))).write(
+                  ..where((tbl) => tbl.id.equals(order.id)))
+                .write(
               OrdersCompanion(
                 status: const Value('cancelled'),
                 completedAt: Value(now),
@@ -3740,18 +3804,18 @@ class AutoSpotGridExecutionService {
                   (order.status == 'filled' ||
                       _d(order.executedQuantity) > Decimal.zero)),
         );
-        final lastFilledBuy =
-            gridOrders
-                .where(
-                  (order) =>
-                      order.side == 'BUY' &&
-                      (order.status == 'filled' ||
-                          _d(order.executedQuantity) > Decimal.zero),
-                )
-                .toList()
-              ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        final lastFilledBuy = gridOrders
+            .where(
+              (order) =>
+                  order.side == 'BUY' &&
+                  (order.status == 'filled' ||
+                      _d(order.executedQuantity) > Decimal.zero),
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         await (db.update(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(entry.key))).write(
+              ..where((tbl) => tbl.id.equals(entry.key)))
+            .write(
           GridLevelsCompanion(
             status: Value(hasLongInventory ? 'buyFilled' : 'waitingBuy'),
             lifecycleStatus: Value(
@@ -3759,10 +3823,9 @@ class AutoSpotGridExecutionService {
             ),
             linkedOrderId: const Value(null),
             activeOrderId: const Value(null),
-            lastBuyOrderId:
-                hasLongInventory && lastFilledBuy.isNotEmpty
-                    ? Value(lastFilledBuy.first.id)
-                    : const Value(null),
+            lastBuyOrderId: hasLongInventory && lastFilledBuy.isNotEmpty
+                ? Value(lastFilledBuy.first.id)
+                : const Value(null),
             lastSellOrderId: const Value(null),
             updatedAt: Value(now),
           ),
@@ -3782,9 +3845,9 @@ class AutoSpotGridExecutionService {
   }
 
   Future<bool> repairFuturesLongGridLevel(String gridLevelId) async {
-    final level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    final level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -3795,12 +3858,13 @@ class AutoSpotGridExecutionService {
     if (strategy.environment != futuresGridEnvironment) {
       throw StateError('当前策略不是 LIVE 合约 LONG 网格策略。');
     }
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.gridLevelId.equals(gridLevelId) &
-              tbl.source.equals(futuresLongSource),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(gridLevelId) &
+                tbl.source.equals(futuresLongSource),
+          ))
+        .get();
     final syncedFromBinance = await _repairFuturesLongGridLevelFromHistory(
       level,
       orders,
@@ -3811,8 +3875,7 @@ class AutoSpotGridExecutionService {
     }
     final status = level.lifecycleStatus ?? level.status;
     final activeOrderId = level.activeOrderId;
-    final hasDanglingActiveOrder =
-        activeOrderId != null &&
+    final hasDanglingActiveOrder = activeOrderId != null &&
         activeOrderId.isNotEmpty &&
         !orders.any((order) => order.id == activeOrderId);
     final hasRepairableOrder = orders.any(_isRepairableFuturesLongLocalOrder);
@@ -3845,8 +3908,8 @@ class AutoSpotGridExecutionService {
       }
       for (final order in orders.where(_isRepairableFuturesLongLocalOrder)) {
         if (_isActiveOrder(order)) {
-          await (db.update(db.orders)
-            ..where((tbl) => tbl.id.equals(order.id))).write(
+          await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+              .write(
             OrdersCompanion(
               status: const Value('cancelled'),
               completedAt: Value(now),
@@ -3856,17 +3919,16 @@ class AutoSpotGridExecutionService {
           );
         }
       }
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: Value(hasLongInventory ? 'buyFilled' : 'waitingBuy'),
           lifecycleStatus: Value(hasLongInventory ? 'buyFilled' : 'waitingBuy'),
           linkedOrderId: const Value(null),
           activeOrderId: const Value(null),
-          lastBuyOrderId:
-              hasLongInventory && lastFilledBuy != null
-                  ? Value(lastFilledBuy.id)
-                  : const Value(null),
+          lastBuyOrderId: hasLongInventory && lastFilledBuy != null
+              ? Value(lastFilledBuy.id)
+              : const Value(null),
           lastSellOrderId: const Value(null),
           updatedAt: Value(now),
         ),
@@ -3893,16 +3955,15 @@ class AutoSpotGridExecutionService {
       if (_isNoPositionReleasedFuturesLongBuy(order)) {
         continue;
       }
-      final historical =
-          await (db.select(db.exchangeHistoricalOrders)
-                ..where(
-                  (tbl) =>
-                      tbl.symbol.equals(normalizedSymbol) &
-                      tbl.clientOrderId.equals(order.clientOrderId),
-                )
-                ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)])
-                ..limit(1))
-              .getSingleOrNull();
+      final historical = await (db.select(db.exchangeHistoricalOrders)
+            ..where(
+              (tbl) =>
+                  tbl.symbol.equals(normalizedSymbol) &
+                  tbl.clientOrderId.equals(order.clientOrderId),
+            )
+            ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)])
+            ..limit(1))
+          .getSingleOrNull();
       if (historical == null) {
         final syncedRemote = await liveExecution.syncFuturesOrderFromBinance(
           order,
@@ -3914,8 +3975,8 @@ class AutoSpotGridExecutionService {
         continue;
       }
       final status = _normalizeExchangeStatus(historical.status);
-      await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals(order.id))).write(
+      await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+          .write(
         OrdersCompanion(
           exchangeOrderId: Value(historical.exchangeOrderId),
           status: Value(status),
@@ -3936,12 +3997,13 @@ class AutoSpotGridExecutionService {
     if (synced == 0) {
       return false;
     }
-    final refreshedOrders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.gridLevelId.equals(level.id) &
-              tbl.source.equals(futuresLongSource),
-        )).get();
+    final refreshedOrders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(level.id) &
+                tbl.source.equals(futuresLongSource),
+          ))
+        .get();
     final runtime = _deriveFuturesLongGridRuntime(level, refreshedOrders);
     if (runtime.lifecycleStatus == 'buyFilled') {
       final currentLong = await liveExecution.currentFuturesLongQuantity(
@@ -3955,7 +4017,8 @@ class AutoSpotGridExecutionService {
             updatedAt: now,
           );
           await (db.update(db.gridLevels)
-            ..where((tbl) => tbl.id.equals(level.id))).write(
+                ..where((tbl) => tbl.id.equals(level.id)))
+              .write(
             GridLevelsCompanion(
               status: const Value('waitingBuy'),
               lifecycleStatus: const Value('waitingBuy'),
@@ -3979,8 +4042,8 @@ class AutoSpotGridExecutionService {
         return true;
       }
     }
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: Value(runtime.lifecycleStatus),
         lifecycleStatus: Value(runtime.lifecycleStatus),
@@ -4004,20 +4067,19 @@ class AutoSpotGridExecutionService {
   }
 
   Future<bool> _repairFuturesLongBuyLevelForResubmit(GridLevel level) async {
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.gridLevelId.equals(level.id) &
-              tbl.source.equals(futuresLongSource),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(level.id) &
+                tbl.source.equals(futuresLongSource),
+          ))
+        .get();
     final status = level.lifecycleStatus ?? level.status;
     final activeOrderId = level.activeOrderId;
-    final hasDanglingActiveOrder =
-        activeOrderId != null &&
+    final hasDanglingActiveOrder = activeOrderId != null &&
         activeOrderId.isNotEmpty &&
         !orders.any((order) => order.id == activeOrderId);
-    final canRepair =
-        orders.any(
+    final canRepair = orders.any(
           (order) =>
               order.side == 'BUY' &&
               _isRepairableFuturesLongLocalOrder(order) &&
@@ -4043,8 +4105,8 @@ class AutoSpotGridExecutionService {
     await db.transaction(() async {
       for (final order in orders.where(_isRepairableFuturesLongLocalOrder)) {
         if (_isActiveOrder(order)) {
-          await (db.update(db.orders)
-            ..where((tbl) => tbl.id.equals(order.id))).write(
+          await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+              .write(
             OrdersCompanion(
               status: const Value('cancelled'),
               completedAt: Value(now),
@@ -4054,8 +4116,8 @@ class AutoSpotGridExecutionService {
           );
         }
       }
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: const Value('waitingBuy'),
           lifecycleStatus: const Value('waitingBuy'),
@@ -4082,8 +4144,8 @@ class AutoSpotGridExecutionService {
           _d(order.executedQuantity) <= Decimal.zero) {
         continue;
       }
-      await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals(order.id))).write(
+      await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+          .write(
         OrdersCompanion(
           errorMessage: const Value(noPositionReleasedFuturesLongBuyMessage),
           updatedAt: Value(updatedAt),
@@ -4169,22 +4231,21 @@ class AutoSpotGridExecutionService {
         );
         continue;
       }
-      final historical =
-          await (db.select(db.exchangeHistoricalOrders)
-                ..where(
-                  (tbl) =>
-                      tbl.accountType.equals('futuresSubAccount') &
-                      tbl.marketType.equals('usdtFutures') &
-                      tbl.environment.equals('live') &
-                      tbl.keyProfileId.equals(
-                        _profileScope(order.keyProfileId),
-                      ) &
-                      tbl.symbol.equals(strategy.symbol) &
-                      tbl.clientOrderId.equals(order.clientOrderId),
-                )
-                ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)])
-                ..limit(1))
-              .getSingleOrNull();
+      final historical = await (db.select(db.exchangeHistoricalOrders)
+            ..where(
+              (tbl) =>
+                  tbl.accountType.equals('futuresSubAccount') &
+                  tbl.marketType.equals('usdtFutures') &
+                  tbl.environment.equals('live') &
+                  tbl.keyProfileId.equals(
+                    _profileScope(order.keyProfileId),
+                  ) &
+                  tbl.symbol.equals(strategy.symbol) &
+                  tbl.clientOrderId.equals(order.clientOrderId),
+            )
+            ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)])
+            ..limit(1))
+          .getSingleOrNull();
       if (historical == null) {
         if (!_shouldDirectQueryMissingFuturesHistory(order)) {
           _debugTrace(
@@ -4222,8 +4283,8 @@ class AutoSpotGridExecutionService {
             'executed=${historical.executedQuantity} '
             'profile=${_profileScope(order.keyProfileId)}',
       );
-      await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals(order.id))).write(
+      await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+          .write(
         OrdersCompanion(
           exchangeOrderId: Value(historical.exchangeOrderId),
           status: Value(status),
@@ -4264,10 +4325,9 @@ class AutoSpotGridExecutionService {
 
     final refreshed = await _futuresLongReconcileOrders(strategy);
     final active = refreshed.where(_isActiveOrder).length;
-    final completed =
-        refreshed
-            .where((order) => {'filled', 'cancelled'}.contains(order.status))
-            .length;
+    final completed = refreshed
+        .where((order) => {'filled', 'cancelled'}.contains(order.status))
+        .length;
     final levelsById = {
       for (final level in await _levels(strategyId)) level.id: level,
     };
@@ -4275,10 +4335,9 @@ class AutoSpotGridExecutionService {
         .where(
           (order) => _isActionableFuturesLongError(
             order,
-            level:
-                order.gridLevelId == null
-                    ? null
-                    : levelsById[order.gridLevelId],
+            level: order.gridLevelId == null
+                ? null
+                : levelsById[order.gridLevelId],
           ),
         )
         .toList(growable: false);
@@ -4335,23 +4394,21 @@ class AutoSpotGridExecutionService {
     final levels = await _levels(strategyId);
     final activeOrders = _activeLongGridOrderCount(levels);
     final waitingBuyLevels = levels.where(_isWaitingLongBuyLevel).length;
-    final openLongLevels =
-        levels
-            .where(
-              (level) => const {
-                'buyFilled',
-                'sellSubmitting',
-                'sellOpen',
-                'sellPartiallyFilled',
-              }.contains(level.lifecycleStatus ?? level.status),
-            )
-            .length;
-    final errorLevels =
-        levels
-            .where(
-              (level) => (level.lifecycleStatus ?? level.status) == 'error',
-            )
-            .length;
+    final openLongLevels = levels
+        .where(
+          (level) => const {
+            'buyFilled',
+            'sellSubmitting',
+            'sellOpen',
+            'sellPartiallyFilled',
+          }.contains(level.lifecycleStatus ?? level.status),
+        )
+        .length;
+    final errorLevels = levels
+        .where(
+          (level) => (level.lifecycleStatus ?? level.status) == 'error',
+        )
+        .length;
     final canRestore = report.errorOrders == 0 && errorLevels == 0;
     if (canRestore) {
       await _setStatusClearError(strategyId, 'running');
@@ -4378,10 +4435,9 @@ class AutoSpotGridExecutionService {
       waitingBuyLevels: waitingBuyLevels,
       openLongLevels: openLongLevels,
       errorLevels: errorLevels,
-      message:
-          canRestore
-              ? '策略已恢复 running，并已清空旧错误。'
-              : '仍存在需要处理的错误层或异常订单，策略保持 error。',
+      message: canRestore
+          ? '策略已恢复 running，并已清空旧错误。'
+          : '仍存在需要处理的错误层或异常订单，策略保持 error。',
     );
   }
 
@@ -4481,9 +4537,9 @@ class AutoSpotGridExecutionService {
     String strategyId, {
     bool verifyAvailableQuantity = true,
   }) async {
-    final levels =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+    final levels = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
     for (final level in levels) {
       final status = level.lifecycleStatus ?? level.status;
       if (status != 'buyFilled') {
@@ -4517,6 +4573,12 @@ class AutoSpotGridExecutionService {
     }
     final config = await loadEditableConfig(strategyId);
     final maxOrders = config?.maxOpenOrders ?? defaultMaxOpenOrders;
+    final targetOrders = config?.longEntryTriggerMode ==
+            LiveSpotGridEditableConfig.longEntryTriggerModePrehang
+        ? (config!.longEntryPrehangLevels < maxOrders
+            ? config.longEntryPrehangLevels
+            : maxOrders)
+        : maxOrders;
     final leverage = config?.futuresLeverage ?? 1;
     final current = _currentFuturesGridPrice(strategy);
     if (current == null) {
@@ -4524,35 +4586,31 @@ class AutoSpotGridExecutionService {
     }
     final levels = await _levels(strategyId);
     var activeCount = _activeLongGridOrderCount(levels);
-    final candidates =
-        levels.where((level) {
-            if (activeCount >= maxOrders) {
-              return false;
-            }
-            if (level.activeOrderId != null &&
-                level.activeOrderId!.isNotEmpty) {
-              return false;
-            }
-            if (!_isWaitingLongBuyLevel(level)) {
-              return false;
-            }
-            final buyPrice = _gridBuyPrice(level);
-            return buyPrice != null &&
-                _isFuturesLongBuyTriggerReached(
-                  buyPrice: buyPrice,
-                  currentPrice: current,
-                  triggerDistance:
-                      config?.longEntryTriggerDistanceUsdt ??
-                      defaultLongEntryTriggerDistanceUsdt,
-                );
-          }).toList()
-          ..sort(
-            (a, b) => _abs(
-              _gridBuyPrice(a)! - current,
-            ).compareTo(_abs(_gridBuyPrice(b)! - current)),
+    final candidates = levels.where((level) {
+      if (activeCount >= targetOrders) {
+        return false;
+      }
+      if (level.activeOrderId != null && level.activeOrderId!.isNotEmpty) {
+        return false;
+      }
+      if (!_isWaitingLongBuyLevel(level)) {
+        return false;
+      }
+      final buyPrice = _gridBuyPrice(level);
+      return buyPrice != null &&
+          _isFuturesLongBuySubmissionEligible(
+            buyPrice: buyPrice,
+            currentPrice: current,
+            config: config,
           );
+    }).toList()
+      ..sort(
+        (a, b) => _abs(
+          _gridBuyPrice(a)! - current,
+        ).compareTo(_abs(_gridBuyPrice(b)! - current)),
+      );
     for (final level in candidates) {
-      if (activeCount >= maxOrders) {
+      if (activeCount >= targetOrders) {
         break;
       }
       final buyPrice = _gridBuyPrice(level);
@@ -4579,29 +4637,31 @@ class AutoSpotGridExecutionService {
     String symbol,
   ) async {
     final normalizedSymbol = symbol.toUpperCase();
-    final localOpen =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(futuresLongSource) &
-              tbl.marketType.equals('usdtFutures') &
-              tbl.symbol.equals(normalizedSymbol) &
-              tbl.status.isIn(['new', 'partiallyFilled']),
-        )).get();
+    final localOpen = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(futuresLongSource) &
+                tbl.marketType.equals('usdtFutures') &
+                tbl.symbol.equals(normalizedSymbol) &
+                tbl.status.isIn(['new', 'partiallyFilled']),
+          ))
+        .get();
     if (localOpen.isEmpty) {
       return;
     }
-    final exchangeOpen =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.accountType.equals('futuresSubAccount') &
-              tbl.marketType.equals('usdtFutures') &
-              tbl.environment.equals('live') &
-              tbl.symbol.equals(normalizedSymbol) &
-              tbl.keyProfileId.isIn(
-                localOpen.map((order) => _profileScope(order.keyProfileId)),
-              ),
-        )).get();
+    final exchangeOpen = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.accountType.equals('futuresSubAccount') &
+                tbl.marketType.equals('usdtFutures') &
+                tbl.environment.equals('live') &
+                tbl.symbol.equals(normalizedSymbol) &
+                tbl.keyProfileId.isIn(
+                  localOpen.map((order) => _profileScope(order.keyProfileId)),
+                ),
+          ))
+        .get();
     final exchangeOpenClientIds = {
       for (final order in exchangeOpen) order.clientOrderId,
     };
@@ -4624,22 +4684,21 @@ class AutoSpotGridExecutionService {
         );
         continue;
       }
-      final historical =
-          await (db.select(db.exchangeHistoricalOrders)
-                ..where(
-                  (tbl) =>
-                      tbl.accountType.equals('futuresSubAccount') &
-                      tbl.marketType.equals('usdtFutures') &
-                      tbl.environment.equals('live') &
-                      tbl.keyProfileId.equals(
-                        _profileScope(order.keyProfileId),
-                      ) &
-                      tbl.symbol.equals(normalizedSymbol) &
-                      tbl.clientOrderId.equals(order.clientOrderId),
-                )
-                ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)])
-                ..limit(1))
-              .getSingleOrNull();
+      final historical = await (db.select(db.exchangeHistoricalOrders)
+            ..where(
+              (tbl) =>
+                  tbl.accountType.equals('futuresSubAccount') &
+                  tbl.marketType.equals('usdtFutures') &
+                  tbl.environment.equals('live') &
+                  tbl.keyProfileId.equals(
+                    _profileScope(order.keyProfileId),
+                  ) &
+                  tbl.symbol.equals(normalizedSymbol) &
+                  tbl.clientOrderId.equals(order.clientOrderId),
+            )
+            ..orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)])
+            ..limit(1))
+          .getSingleOrNull();
       var historicalStatus = historical?.status.toUpperCase();
       if (historical == null) {
         _debugTrace(
@@ -4649,9 +4708,9 @@ class AutoSpotGridExecutionService {
               'localStatus=${order.status}',
         );
         final syncedRemote = await _trySyncFuturesOrderFromBinance(order);
-        final refreshedOrder =
-            await (db.select(db.orders)
-              ..where((tbl) => tbl.id.equals(order.id))).getSingleOrNull();
+        final refreshedOrder = await (db.select(db.orders)
+              ..where((tbl) => tbl.id.equals(order.id)))
+            .getSingleOrNull();
         _debugTrace(
           'LONG_RECONCILE',
           'direct query after open missing client=${order.clientOrderId} '
@@ -4689,9 +4748,9 @@ class AutoSpotGridExecutionService {
               'remote=$historicalStatus',
         );
         final syncedRemote = await _trySyncFuturesOrderFromBinance(order);
-        final refreshedOrder =
-            await (db.select(db.orders)
-              ..where((tbl) => tbl.id.equals(order.id))).getSingleOrNull();
+        final refreshedOrder = await (db.select(db.orders)
+              ..where((tbl) => tbl.id.equals(order.id)))
+            .getSingleOrNull();
         _debugTrace(
           'LONG_RECONCILE',
           'direct verify active history client=${order.clientOrderId} '
@@ -4728,8 +4787,8 @@ class AutoSpotGridExecutionService {
               'grid=${order.gridLevelId ?? '-'} side=${order.side}; '
               'mark local filled',
         );
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             exchangeOrderId: Value(historical.exchangeOrderId),
             status: const Value('filled'),
@@ -4745,10 +4804,9 @@ class AutoSpotGridExecutionService {
         );
         continue;
       }
-      final releasedStatus =
-          historicalStatus == null
-              ? 'cancelled'
-              : _normalizeExchangeStatus(historicalStatus);
+      final releasedStatus = historicalStatus == null
+          ? 'cancelled'
+          : _normalizeExchangeStatus(historicalStatus);
       _debugTrace(
         'LONG_RECONCILE',
         'release missing open order client=${order.clientOrderId} '
@@ -4757,8 +4815,8 @@ class AutoSpotGridExecutionService {
             'released=$releasedStatus ageSec=${now.difference(order.createdAt).inSeconds} '
             'executed=${order.executedQuantity} hasLongInventory=$hasLongInventory',
       );
-      await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals(order.id))).write(
+      await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+          .write(
         OrdersCompanion(
           status: Value(releasedStatus),
           completedAt: Value(now),
@@ -4768,25 +4826,24 @@ class AutoSpotGridExecutionService {
         ),
       );
       final executed = _d(order.executedQuantity);
-      final gridStatus =
-          order.side == 'SELL'
-              ? hasLongInventory
-                  ? 'buyFilled'
-                  : 'waitingBuy'
-              : executed > Decimal.zero && hasLongInventory
+      final gridStatus = order.side == 'SELL'
+          ? hasLongInventory
+              ? 'buyFilled'
+              : 'waitingBuy'
+          : executed > Decimal.zero && hasLongInventory
               ? 'buyFilled'
               : 'waitingBuy';
       await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(order.gridLevelId ?? ''))).write(
+            ..where((tbl) => tbl.id.equals(order.gridLevelId ?? '')))
+          .write(
         GridLevelsCompanion(
           status: Value(gridStatus),
           lifecycleStatus: Value(gridStatus),
           activeOrderId: const Value(null),
           linkedOrderId: const Value(null),
-          lastBuyOrderId:
-              order.side == 'BUY' && executed == Decimal.zero
-                  ? const Value(null)
-                  : const Value.absent(),
+          lastBuyOrderId: order.side == 'BUY' && executed == Decimal.zero
+              ? const Value(null)
+              : const Value.absent(),
           lastSellOrderId:
               order.side == 'SELL' ? const Value(null) : const Value.absent(),
           updatedAt: Value(now),
@@ -4822,31 +4879,35 @@ class AutoSpotGridExecutionService {
     final rows = <Order>[];
     if (referencedIds.isNotEmpty) {
       rows.addAll(
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategy.id) &
-              tbl.source.equals(futuresLongSource) &
-              tbl.marketType.equals('usdtFutures') &
-              tbl.symbol.equals(strategy.symbol) &
-              tbl.id.isIn(referencedIds),
-        )).get(),
+        await (db.select(db.orders)
+              ..where(
+                (tbl) =>
+                    tbl.strategyId.equals(strategy.id) &
+                    tbl.source.equals(futuresLongSource) &
+                    tbl.marketType.equals('usdtFutures') &
+                    tbl.symbol.equals(strategy.symbol) &
+                    tbl.id.isIn(referencedIds),
+              ))
+            .get(),
       );
     }
     rows.addAll(
-      await (db.select(db.orders)..where(
-        (tbl) =>
-            tbl.strategyId.equals(strategy.id) &
-            tbl.source.equals(futuresLongSource) &
-            tbl.marketType.equals('usdtFutures') &
-            tbl.symbol.equals(strategy.symbol) &
-            tbl.status.isIn([
-              'created',
-              'submitting',
-              'new',
-              'partiallyFilled',
-              'unknown',
-            ]),
-      )).get(),
+      await (db.select(db.orders)
+            ..where(
+              (tbl) =>
+                  tbl.strategyId.equals(strategy.id) &
+                  tbl.source.equals(futuresLongSource) &
+                  tbl.marketType.equals('usdtFutures') &
+                  tbl.symbol.equals(strategy.symbol) &
+                  tbl.status.isIn([
+                    'created',
+                    'submitting',
+                    'new',
+                    'partiallyFilled',
+                    'unknown',
+                  ]),
+            ))
+          .get(),
     );
 
     final byId = <String, Order>{};
@@ -4868,13 +4929,14 @@ class AutoSpotGridExecutionService {
     List<Order>? scopedOrders,
   }) async {
     final levels = await _levels(strategyId);
-    final orders =
-        scopedOrders ??
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(futuresLongSource),
-        )).get();
+    final orders = scopedOrders ??
+        await (db.select(db.orders)
+              ..where(
+                (tbl) =>
+                    tbl.strategyId.equals(strategyId) &
+                    tbl.source.equals(futuresLongSource),
+              ))
+            .get();
     final ordersByGrid = <String, List<Order>>{};
     for (final order in orders) {
       final gridId = order.gridLevelId;
@@ -4889,7 +4951,8 @@ class AutoSpotGridExecutionService {
         final gridOrders = ordersByGrid[level.id] ?? const <Order>[];
         final runtime = _deriveFuturesLongGridRuntime(level, gridOrders);
         await (db.update(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(level.id))).write(
+              ..where((tbl) => tbl.id.equals(level.id)))
+            .write(
           GridLevelsCompanion(
             status: Value(runtime.lifecycleStatus),
             lifecycleStatus: Value(runtime.lifecycleStatus),
@@ -4910,14 +4973,13 @@ class AutoSpotGridExecutionService {
     GridLevel level,
     List<Order> orders,
   ) {
-    final effectiveOrders =
-        orders
-            .where(
-              (order) =>
-                  !_isReleasedFuturesLongOrder(order) &&
-                  !_isTerminalZeroFillFuturesLongCloseOrder(order),
-            )
-            .toList();
+    final effectiveOrders = orders
+        .where(
+          (order) =>
+              !_isReleasedFuturesLongOrder(order) &&
+              !_isTerminalZeroFillFuturesLongCloseOrder(order),
+        )
+        .toList();
     if (effectiveOrders.isEmpty) {
       final status = level.status == 'disabled' ? 'disabled' : 'waitingBuy';
       return _GridRuntimeSnapshot(lifecycleStatus: status);
@@ -4945,35 +5007,32 @@ class AutoSpotGridExecutionService {
         _shouldRetainSellOrderForLifecycle(lifecycleStatus, current)
             ? lastSell
             : null;
-    final completedSellCount =
-        sorted
-            .where((order) => order.side == 'SELL' && order.status == 'filled')
-            .length;
+    final completedSellCount = sorted
+        .where((order) => order.side == 'SELL' && order.status == 'filled')
+        .length;
     return _GridRuntimeSnapshot(
       lifecycleStatus: lifecycleStatus,
       currentOrderId: completedSell ? null : current.id,
-      activeOrderId:
-          completedSell
-              ? null
-              : _isActiveOrder(current)
+      activeOrderId: completedSell
+          ? null
+          : _isActiveOrder(current)
               ? current.id
               : null,
       lastBuyOrderId: completedSell ? null : lastBuy?.id,
       lastSellOrderId: retainedLastSell?.id,
       lastCompletedOrderId: lastCompleted?.id,
-      cycleNumber:
-          completedSellCount > level.cycleNumber
-              ? completedSellCount
-              : level.cycleNumber,
+      cycleNumber: completedSellCount > level.cycleNumber
+          ? completedSellCount
+          : level.cycleNumber,
     );
   }
 
   Future<Decimal> _futuresLongCloseQuantity(GridLevel level) async {
     final lastBuyOrderId = level.lastBuyOrderId;
     if (lastBuyOrderId != null && lastBuyOrderId.isNotEmpty) {
-      final buyOrder =
-          await (db.select(db.orders)
-            ..where((tbl) => tbl.id.equals(lastBuyOrderId))).getSingleOrNull();
+      final buyOrder = await (db.select(db.orders)
+            ..where((tbl) => tbl.id.equals(lastBuyOrderId)))
+          .getSingleOrNull();
       final executed = _d(buyOrder?.executedQuantity ?? '0');
       if (executed > Decimal.zero) {
         return executed;
@@ -5001,18 +5060,19 @@ class AutoSpotGridExecutionService {
         reduceOnlySellOrderCount: 0,
       );
     }
-    final openOrders =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.accountType.equals('futuresSubAccount') &
-              tbl.marketType.equals('usdtFutures') &
-              tbl.environment.equals('live') &
-              tbl.symbol.equals(normalizedSymbol) &
-              tbl.side.equals('SELL') &
-              (tbl.positionSide.equals('LONG') |
-                  tbl.positionSide.equals('BOTH') |
-                  tbl.positionSide.isNull()),
-        )).get();
+    final openOrders = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.accountType.equals('futuresSubAccount') &
+                tbl.marketType.equals('usdtFutures') &
+                tbl.environment.equals('live') &
+                tbl.symbol.equals(normalizedSymbol) &
+                tbl.side.equals('SELL') &
+                (tbl.positionSide.equals('LONG') |
+                    tbl.positionSide.equals('BOTH') |
+                    tbl.positionSide.isNull()),
+          ))
+        .get();
     var reserved = Decimal.zero;
     var reduceOnlySellOrderCount = 0;
     for (final order in openOrders) {
@@ -5181,9 +5241,7 @@ class AutoSpotGridExecutionService {
   }) async {
     final previousStatus = (await _strategy(strategyId))?.status;
     final runId = _uuid.v4();
-    await db
-        .into(db.reconciliationRuns)
-        .insert(
+    await db.into(db.reconciliationRuns).insert(
           ReconciliationRunsCompanion.insert(
             id: runId,
             status: 'running',
@@ -5206,7 +5264,8 @@ class AutoSpotGridExecutionService {
       await _recomputeGridLifecycle(strategyId);
       await _recalculateStrategyBtc(strategyId);
       await (db.update(db.reconciliationRuns)
-        ..where((tbl) => tbl.id.equals(runId))).write(
+            ..where((tbl) => tbl.id.equals(runId)))
+          .write(
         ReconciliationRunsCompanion(
           status: const Value('success'),
           completedAt: Value(DateTime.now().toUtc()),
@@ -5223,7 +5282,8 @@ class AutoSpotGridExecutionService {
       await _checkOutOfRange(strategyId);
     } catch (error) {
       await (db.update(db.reconciliationRuns)
-        ..where((tbl) => tbl.id.equals(runId))).write(
+            ..where((tbl) => tbl.id.equals(runId)))
+          .write(
         ReconciliationRunsCompanion(
           status: const Value('failed'),
           completedAt: Value(DateTime.now().toUtc()),
@@ -5242,34 +5302,36 @@ class AutoSpotGridExecutionService {
     final symbol = strategy?.symbol ?? 'BTCUSDT';
     final baseAsset = _baseAssetForSymbol(symbol);
     await liveExecution.refreshSpotSnapshotForSymbol(symbol);
-    final beforeFills =
-        await (db.select(db.fills)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+    final beforeFills = await (db.select(db.fills)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
     await _syncExchangeState(strategyId);
     await _recalculateStrategyBtc(strategyId);
-    final afterFills =
-        await (db.select(db.fills)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
-    final binanceOpen =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.environment.equals('live') &
-              tbl.marketType.equals('spot') &
-              tbl.symbol.equals(symbol) &
-              tbl.clientOrderId.like('$clientOrderPrefix%'),
-        )).get();
-    final localOpen =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-              ]),
-        )).get();
+    final afterFills = await (db.select(db.fills)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
+    final binanceOpen = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals('live') &
+                tbl.marketType.equals('spot') &
+                tbl.symbol.equals(symbol) &
+                tbl.clientOrderId.like('$clientOrderPrefix%'),
+          ))
+        .get();
+    final localOpen = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                ]),
+          ))
+        .get();
     var statusMismatches = 0;
     for (final local in localOpen) {
       ExchangeOpenOrder? remote;
@@ -5284,20 +5346,22 @@ class AutoSpotGridExecutionService {
         statusMismatches += 1;
       }
     }
-    final filledWithoutReverse =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.status.equals('filled') &
-              tbl.purpose.isIn(['gridBuy', 'gridSell']),
-        )).get();
+    final filledWithoutReverse = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.status.equals('filled') &
+                tbl.purpose.isIn(['gridBuy', 'gridSell']),
+          ))
+        .get();
     var missingReverse = 0;
     for (final order in filledWithoutReverse) {
-      final reverse =
-          await (db.select(db.orders)..where(
-            (tbl) => tbl.parentOrderId.equals(order.id),
-          )).getSingleOrNull();
+      final reverse = await (db.select(db.orders)
+            ..where(
+              (tbl) => tbl.parentOrderId.equals(order.id),
+            ))
+          .getSingleOrNull();
       if (reverse == null) {
         missingReverse += 1;
       }
@@ -5353,28 +5417,23 @@ class AutoSpotGridExecutionService {
     final now = DateTime.now().toUtc();
     final levels = _gridGenerator.generate(config);
     final intervals = _liveGridIntervals(levels, rules);
-    final perGridQuote =
-        singleGridAmount ??
+    final perGridQuote = singleGridAmount ??
         (intervals.isEmpty
             ? Decimal.zero
             : (config.spotCapital / Decimal.fromInt(intervals.length))
                 .toDecimal(scaleOnInfinitePrecision: 8));
     final leverage = futuresLeverage.clamp(1, 125);
-    final perGridNotional =
-        useFuturesRules
-            ? perGridQuote * Decimal.fromInt(leverage)
-            : perGridQuote;
+    final perGridNotional = useFuturesRules
+        ? perGridQuote * Decimal.fromInt(leverage)
+        : perGridQuote;
     for (final interval in intervals) {
       final buyPrice = interval.buyPrice;
       final sellPrice = interval.sellPrice;
-      final qty =
-          rules?.quantizeQuantity(
+      final qty = rules?.quantizeQuantity(
             (perGridNotional / buyPrice).toDecimal(scaleOnInfinitePrecision: 8),
           ) ??
           (perGridNotional / buyPrice).toDecimal(scaleOnInfinitePrecision: 8);
-      await db
-          .into(db.gridLevels)
-          .insert(
+      await db.into(db.gridLevels).insert(
             GridLevelsCompanion.insert(
               id: '${strategyId}_grid_${interval.index}',
               strategyId: strategyId,
@@ -5495,30 +5554,49 @@ class AutoSpotGridExecutionService {
         currentPrice <= buyPrice + normalizedDistance;
   }
 
+  bool _isFuturesLongBuySubmissionEligible({
+    required Decimal buyPrice,
+    required Decimal currentPrice,
+    required LiveSpotGridEditableConfig? config,
+  }) {
+    if (config?.longEntryTriggerMode ==
+        LiveSpotGridEditableConfig.longEntryTriggerModePrehang) {
+      // Prehang mode may place orders at or below the current mark, but never
+      // above it.
+      return buyPrice <= currentPrice;
+    }
+    return _isFuturesLongBuyTriggerReached(
+      buyPrice: buyPrice,
+      currentPrice: currentPrice,
+      triggerDistance: config?.longEntryTriggerDistanceUsdt ??
+          defaultLongEntryTriggerDistanceUsdt,
+    );
+  }
+
   Set<String> _initialFuturesLongBuyCandidates(
     List<GridLevel> levels,
     Decimal currentPrice,
     LiveSpotGridEditableConfig editConfig,
   ) {
-    final buyLevels =
-        levels
-            .where(
-              (level) =>
-                  _isWaitingLongBuyLevel(level) &&
-                  _gridBuyPrice(level) != null &&
-                  _gridSellPrice(level) != null &&
-                  _isFuturesLongBuyTriggerReached(
-                    buyPrice: _gridBuyPrice(level)!,
-                    currentPrice: currentPrice,
-                    triggerDistance: editConfig.longEntryTriggerDistanceUsdt,
-                  ),
-            )
-            .toList()
-          ..sort((a, b) => _gridBuyPrice(b)!.compareTo(_gridBuyPrice(a)!));
-    return buyLevels
-        .take(editConfig.initialBuyOrderCount)
-        .map((level) => level.id)
-        .toSet();
+    final buyLevels = levels
+        .where(
+          (level) =>
+              _isWaitingLongBuyLevel(level) &&
+              _gridBuyPrice(level) != null &&
+              _gridSellPrice(level) != null &&
+              _isFuturesLongBuySubmissionEligible(
+                buyPrice: _gridBuyPrice(level)!,
+                currentPrice: currentPrice,
+                config: editConfig,
+              ),
+        )
+        .toList()
+      ..sort((a, b) => _gridBuyPrice(b)!.compareTo(_gridBuyPrice(a)!));
+    final count = editConfig.longEntryTriggerMode ==
+            LiveSpotGridEditableConfig.longEntryTriggerModePrehang
+        ? editConfig.longEntryPrehangLevels
+        : editConfig.initialBuyOrderCount;
+    return buyLevels.take(count).map((level) => level.id).toSet();
   }
 
   int _activeLongGridOrderCount(List<GridLevel> levels) {
@@ -5575,16 +5653,15 @@ class AutoSpotGridExecutionService {
       source: futuresLongSource,
       purpose: 'futuresLongGridBuy',
     );
-    final created =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(orderId))).getSingleOrNull();
+    final created = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(orderId)))
+        .getSingleOrNull();
     final gridStatus = _gridStatusAfterSubmit(
       side: 'BUY',
       order: created,
       submittingStatus: 'buySubmitting',
     );
-    final activeOrder =
-        created != null &&
+    final activeOrder = created != null &&
         [
           'created',
           'submitting',
@@ -5592,8 +5669,8 @@ class AutoSpotGridExecutionService {
           'partiallyFilled',
           'unknown',
         ].contains(created.status);
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: Value(gridStatus),
         lifecycleStatus: Value(gridStatus),
@@ -5638,8 +5715,8 @@ class AutoSpotGridExecutionService {
     );
     final currentLong = await liveExecution.currentFuturesLongQuantity(symbol);
     final hasRemainingLong = currentLong > Decimal.zero;
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: Value(hasRemainingLong ? 'buyFilled' : 'waitingBuy'),
         lifecycleStatus: Value(hasRemainingLong ? 'buyFilled' : 'waitingBuy'),
@@ -5668,13 +5745,14 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _resetStaleFuturesLongSubmissions(String strategyId) async {
-    final staleOrders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(futuresLongSource) &
-              tbl.status.isIn(['created', 'submitting', 'failed', 'unknown']),
-        )).get();
+    final staleOrders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(futuresLongSource) &
+                tbl.status.isIn(['created', 'submitting', 'failed', 'unknown']),
+          ))
+        .get();
     final now = DateTime.now().toUtc();
     await db.transaction(() async {
       final staleByGrid = <String, List<Order>>{};
@@ -5688,8 +5766,8 @@ class AutoSpotGridExecutionService {
       for (final entry in staleByGrid.entries) {
         final gridId = entry.key;
         final hasSellFailure = entry.value.any((order) => order.side == 'SELL');
-        await (db.update(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridId))).write(
+        await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(gridId)))
+            .write(
           GridLevelsCompanion(
             status: Value(hasSellFailure ? 'buyFilled' : 'waitingBuy'),
             lifecycleStatus: Value(hasSellFailure ? 'buyFilled' : 'waitingBuy'),
@@ -5704,8 +5782,8 @@ class AutoSpotGridExecutionService {
         );
       }
       for (final order in staleOrders) {
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             status: const Value('cancelled'),
             completedAt: Value(now),
@@ -5717,9 +5795,9 @@ class AutoSpotGridExecutionService {
           ),
         );
       }
-      final levels =
-          await (db.select(db.gridLevels)
-            ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+      final levels = await (db.select(db.gridLevels)
+            ..where((tbl) => tbl.strategyId.equals(strategyId)))
+          .get();
       for (final level in levels) {
         if (staleByGrid.containsKey(level.id)) {
           continue;
@@ -5733,7 +5811,8 @@ class AutoSpotGridExecutionService {
           continue;
         }
         await (db.update(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(level.id))).write(
+              ..where((tbl) => tbl.id.equals(level.id)))
+            .write(
           GridLevelsCompanion(
             status: const Value('waitingBuy'),
             lifecycleStatus: const Value('waitingBuy'),
@@ -5754,7 +5833,8 @@ class AutoSpotGridExecutionService {
     final now = DateTime.now().toUtc();
     if (executedQuantity > Decimal.zero) {
       await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(gridLevelId))).write(
+            ..where((tbl) => tbl.id.equals(gridLevelId)))
+          .write(
         GridLevelsCompanion(
           status: const Value('buyFilled'),
           lifecycleStatus: const Value('buyFilled'),
@@ -5766,8 +5846,8 @@ class AutoSpotGridExecutionService {
       );
       return;
     }
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(gridLevelId))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(gridLevelId)))
+        .write(
       GridLevelsCompanion(
         status: const Value('waitingBuy'),
         lifecycleStatus: const Value('waitingBuy'),
@@ -5780,9 +5860,9 @@ class AutoSpotGridExecutionService {
   }
 
   Future<String> submitWaitingBuyGridLevel(String gridLevelId) async {
-    final level =
-        await (db.select(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(gridLevelId))).getSingleOrNull();
+    final level = await (db.select(db.gridLevels)
+          ..where((tbl) => tbl.id.equals(gridLevelId)))
+        .getSingleOrNull();
     if (level == null) {
       throw StateError('网格不存在: $gridLevelId');
     }
@@ -5837,17 +5917,16 @@ class AutoSpotGridExecutionService {
     } finally {
       await _recomputeGridLifecycle(level.strategyId);
     }
-    final created =
-        await (db.select(db.orders)
-              ..where(
-                (tbl) =>
-                    tbl.gridLevelId.equals(level.id) &
-                    tbl.source.equals(source) &
-                    tbl.side.equals('BUY'),
-              )
-              ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
-              ..limit(1))
-            .getSingleOrNull();
+    final created = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(level.id) &
+                tbl.source.equals(source) &
+                tbl.side.equals('BUY'),
+          )
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
     return created?.id ?? level.id;
   }
 
@@ -5858,17 +5937,16 @@ class AutoSpotGridExecutionService {
   ) {
     final buyCount =
         editConfig?.initialBuyOrderCount ?? defaultInitialBuyOrderCount;
-    final buyLevels =
-        levels
-            .where(
-              (level) =>
-                  level.status == 'ready' &&
-                  _gridBuyPrice(level) != null &&
-                  _gridSellPrice(level) != null &&
-                  _gridBuyPrice(level)! < currentPrice,
-            )
-            .toList()
-          ..sort((a, b) => _gridBuyPrice(b)!.compareTo(_gridBuyPrice(a)!));
+    final buyLevels = levels
+        .where(
+          (level) =>
+              level.status == 'ready' &&
+              _gridBuyPrice(level) != null &&
+              _gridSellPrice(level) != null &&
+              _gridBuyPrice(level)! < currentPrice,
+        )
+        .toList()
+      ..sort((a, b) => _gridBuyPrice(b)!.compareTo(_gridBuyPrice(a)!));
     return buyLevels.take(buyCount).map((level) => level.id).toSet();
   }
 
@@ -5919,8 +5997,8 @@ class AutoSpotGridExecutionService {
       final hasActiveOrder = await _hasActiveOrderForGrid(level.id);
       final resetStatus = side == 'BUY' ? 'ready' : 'buyFilled';
       final resetLifecycle = side == 'BUY' ? 'waitingBuy' : 'buyFilled';
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(level.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+          .write(
         GridLevelsCompanion(
           status: Value(hasActiveOrder ? 'error' : resetStatus),
           lifecycleStatus: Value(hasActiveOrder ? 'error' : resetLifecycle),
@@ -5933,16 +6011,15 @@ class AutoSpotGridExecutionService {
       );
       rethrow;
     }
-    final created =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(orderId))).getSingleOrNull();
+    final created = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(orderId)))
+        .getSingleOrNull();
     final gridStatus = _gridStatusAfterSubmit(
       side: side,
       order: created,
       submittingStatus: lifecycleStatus,
     );
-    final activeOrder =
-        created != null &&
+    final activeOrder = created != null &&
         [
           'created',
           'submitting',
@@ -5950,8 +6027,8 @@ class AutoSpotGridExecutionService {
           'partiallyFilled',
           'unknown',
         ].contains(created.status);
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(level.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(level.id)))
+        .write(
       GridLevelsCompanion(
         status: Value(gridStatus),
         lifecycleStatus: Value(gridStatus),
@@ -5967,11 +6044,12 @@ class AutoSpotGridExecutionService {
 
   Future<void> _recomputeGridLifecycle(String strategyId) async {
     final levels = await _levels(strategyId);
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
+          ))
+        .get();
     final ordersByGrid = <String, List<Order>>{};
     for (final order in orders) {
       final gridId = order.gridLevelId;
@@ -5986,7 +6064,8 @@ class AutoSpotGridExecutionService {
         final gridOrders = ordersByGrid[level.id] ?? const <Order>[];
         final runtime = _deriveGridRuntime(level, gridOrders);
         await (db.update(db.gridLevels)
-          ..where((tbl) => tbl.id.equals(level.id))).write(
+              ..where((tbl) => tbl.id.equals(level.id)))
+            .write(
           GridLevelsCompanion(
             status: Value(runtime.lifecycleStatus),
             lifecycleStatus: Value(runtime.lifecycleStatus),
@@ -6004,14 +6083,15 @@ class AutoSpotGridExecutionService {
   }
 
   Future<int> _markLocalRejectedGridSubmissionsFailed(String strategyId) async {
-    final candidates =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.marketType.equals('spot') &
-              tbl.status.isIn(['unknown', 'created', 'submitting', 'failed']),
-        )).get();
+    final candidates = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.marketType.equals('spot') &
+                tbl.status.isIn(['unknown', 'created', 'submitting', 'failed']),
+          ))
+        .get();
     final rejected =
         candidates.where(_isDefinitiveLocalRejectedSubmission).toList();
     if (rejected.isEmpty) {
@@ -6025,8 +6105,8 @@ class AutoSpotGridExecutionService {
         if (order.status == 'failed') {
           continue;
         }
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             status: const Value('failed'),
             updatedAt: Value(now),
@@ -6046,15 +6126,14 @@ class AutoSpotGridExecutionService {
   _GridRuntimeSnapshot _deriveGridRuntime(GridLevel level, List<Order> orders) {
     final inertFailedOrderIds =
         orders.where(_isInertFailedSubmission).map((order) => order.id).toSet();
-    final effectiveOrders =
-        orders
-            .where(
-              (order) =>
-                  !inertFailedOrderIds.contains(order.id) &&
-                  (order.parentOrderId == null ||
-                      !inertFailedOrderIds.contains(order.parentOrderId)),
-            )
-            .toList();
+    final effectiveOrders = orders
+        .where(
+          (order) =>
+              !inertFailedOrderIds.contains(order.id) &&
+              (order.parentOrderId == null ||
+                  !inertFailedOrderIds.contains(order.parentOrderId)),
+        )
+        .toList();
     if (effectiveOrders.isEmpty) {
       final status = level.status == 'disabled' ? 'disabled' : 'waitingBuy';
       return _GridRuntimeSnapshot(lifecycleStatus: status);
@@ -6071,12 +6150,11 @@ class AutoSpotGridExecutionService {
     );
     var cycleNumber = level.cycleNumber;
     if (lastSell?.status == 'filled') {
-      cycleNumber =
-          sorted
-              .where(
-                (order) => order.side == 'SELL' && order.status == 'filled',
-              )
-              .length;
+      cycleNumber = sorted
+          .where(
+            (order) => order.side == 'SELL' && order.status == 'filled',
+          )
+          .length;
     }
     final lifecycleStatus = _lifecycleStatusForCurrentOrder(current);
     final retainedLastSell =
@@ -6175,10 +6253,9 @@ class AutoSpotGridExecutionService {
         'new' => 'buyOpen',
         'partiallyFilled' => 'buyPartiallyFilled',
         'filled' => 'buyFilled',
-        'cancelled' =>
-          _d(order.executedQuantity) > Decimal.zero
-              ? 'buyFilled'
-              : 'waitingBuy',
+        'cancelled' => _d(order.executedQuantity) > Decimal.zero
+            ? 'buyFilled'
+            : 'waitingBuy',
         _ => 'error',
       };
     }
@@ -6238,17 +6315,17 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _syncExchangeState(String strategyId) async {
-    final localOrders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
-        )).get();
+    final localOrders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) & tbl.source.equals(source),
+          ))
+        .get();
     for (final order in localOrders) {
-      final historical =
-          await (db.select(db.exchangeHistoricalOrders)
-                ..where((tbl) => tbl.clientOrderId.equals(order.clientOrderId))
-                ..limit(1))
-              .getSingleOrNull();
+      final historical = await (db.select(db.exchangeHistoricalOrders)
+            ..where((tbl) => tbl.clientOrderId.equals(order.clientOrderId))
+            ..limit(1))
+          .getSingleOrNull();
       if (historical == null) continue;
       final status = _normalizeExchangeStatus(historical.status);
       if (!_transitionValidator.canTransition(order.status, status)) {
@@ -6262,8 +6339,8 @@ class AutoSpotGridExecutionService {
       }
       try {
         await db.transaction(() async {
-          await (db.update(db.orders)
-            ..where((tbl) => tbl.id.equals(order.id))).write(
+          await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+              .write(
             OrdersCompanion(
               exchangeOrderId: Value(historical.exchangeOrderId),
               status: Value(status),
@@ -6279,16 +6356,16 @@ class AutoSpotGridExecutionService {
               ),
             ),
           );
-          final trades =
-              await (db.select(db.exchangeTrades)..where(
-                (tbl) => tbl.exchangeOrderId.equals(historical.exchangeOrderId),
-              )).get();
+          final trades = await (db.select(db.exchangeTrades)
+                ..where(
+                  (tbl) =>
+                      tbl.exchangeOrderId.equals(historical.exchangeOrderId),
+                ))
+              .get();
           for (final trade in trades) {
             final fillKey =
                 'spot-${trade.symbol}-${historical.exchangeOrderId}-${trade.exchangeTradeId}';
-            await db
-                .into(db.fills)
-                .insert(
+            await db.into(db.fills).insert(
                   FillsCompanion.insert(
                     id: fillKey,
                     strategyId: strategyId,
@@ -6327,14 +6404,15 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _processFilledOrders(String strategyId) async {
-    final completed =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.status.isIn(['filled', 'cancelled']) &
-              tbl.purpose.isIn(['gridBuy', 'gridSell']),
-        )).get();
+    final completed = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.status.isIn(['filled', 'cancelled']) &
+                tbl.purpose.isIn(['gridBuy', 'gridSell']),
+          ))
+        .get();
     for (final order in completed) {
       try {
         await _createReplacementForFilledOrder(order);
@@ -6356,8 +6434,8 @@ class AutoSpotGridExecutionService {
     if (gridLevelId == null) {
       return;
     }
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(gridLevelId))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(gridLevelId)))
+        .write(
       GridLevelsCompanion(
         status: Value(order.side == 'BUY' ? 'buyFilled' : 'sellFilled'),
         lifecycleStatus: const Value('replacementFailed'),
@@ -6379,35 +6457,33 @@ class AutoSpotGridExecutionService {
     required String replacementSide,
     required Decimal replacementPrice,
   }) async {
-    final byParent =
-        await (db.select(db.orders)
-              ..where(
-                (tbl) =>
-                    tbl.strategyId.equals(parent.strategyId) &
-                    tbl.parentOrderId.equals(parent.id),
-              )
-              ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
-              ..limit(1))
-            .getSingleOrNull();
+    final byParent = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(parent.strategyId) &
+                tbl.parentOrderId.equals(parent.id),
+          )
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
     if (byParent != null &&
         byParent.side == replacementSide &&
         byParent.createdAt.isAfter(parent.createdAt)) {
       return byParent;
     }
 
-    final candidates =
-        await (db.select(db.orders)
-              ..where(
-                (tbl) =>
-                    tbl.strategyId.equals(parent.strategyId) &
-                    tbl.gridLevelId.equals(grid.id) &
-                    tbl.side.equals(replacementSide) &
-                    tbl.marketType.equals('spot') &
-                    tbl.source.equals(source) &
-                    tbl.id.equals(parent.id).not(),
-              )
-              ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]))
-            .get();
+    final candidates = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(parent.strategyId) &
+                tbl.gridLevelId.equals(grid.id) &
+                tbl.side.equals(replacementSide) &
+                tbl.marketType.equals('spot') &
+                tbl.source.equals(source) &
+                tbl.id.equals(parent.id).not(),
+          )
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]))
+        .get();
     const meaningfulStatuses = {
       'created',
       'submitting',
@@ -6456,10 +6532,9 @@ class AutoSpotGridExecutionService {
     required Order replacement,
   }) async {
     final rules = liveExecution.spotRulesForSymbol(parent.symbol);
-    final price =
-        rules == null
-            ? _d(replacement.price ?? '0')
-            : rules.quantizePrice(_d(replacement.price ?? '0'));
+    final price = rules == null
+        ? _d(replacement.price ?? '0')
+        : rules.quantizePrice(_d(replacement.price ?? '0'));
     final quantity = await _replacementQuantityForOrder(
       parent,
       replacementSide: replacement.side,
@@ -6481,9 +6556,9 @@ class AutoSpotGridExecutionService {
       await refreshGridLifecycle(parent.strategyId);
       rethrow;
     }
-    final submitted =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(replacement.id))).getSingleOrNull();
+    final submitted = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(replacement.id)))
+        .getSingleOrNull();
     if (submitted == null) {
       throw StateError('提交本地反向单后未找到订单: ${replacement.id}');
     }
@@ -6504,30 +6579,29 @@ class AutoSpotGridExecutionService {
     );
     await db.transaction(() async {
       await (db.update(db.orders)
-        ..where((tbl) => tbl.id.equals(replacement.id))).write(
+            ..where((tbl) => tbl.id.equals(replacement.id)))
+          .write(
         OrdersCompanion(
           parentOrderId: Value(parent.id),
           gridLevelId: Value(grid.id),
           updatedAt: Value(now),
         ),
       );
-      await (db.update(db.gridLevels)
-        ..where((tbl) => tbl.id.equals(grid.id))).write(
+      await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(grid.id)))
+          .write(
         GridLevelsCompanion(
           status: Value(replacementStatus),
           lifecycleStatus: Value(replacementStatus),
           linkedOrderId: Value(replacement.id),
-          activeOrderId:
-              _isActiveOrder(replacement)
-                  ? Value(replacement.id)
-                  : const Value(null),
+          activeOrderId: _isActiveOrder(replacement)
+              ? Value(replacement.id)
+              : const Value(null),
           lastCompletedOrderId: Value(parent.id),
           lastBuyOrderId:
               parent.side == 'BUY' ? Value(parent.id) : Value(replacement.id),
-          lastSellOrderId:
-              replacement.side == 'SELL'
-                  ? Value(replacement.id)
-                  : const Value.absent(),
+          lastSellOrderId: replacement.side == 'SELL'
+              ? Value(replacement.id)
+              : const Value.absent(),
           updatedAt: Value(now),
         ),
       );
@@ -6538,8 +6612,7 @@ class AutoSpotGridExecutionService {
     Order order, {
     bool manual = false,
   }) async {
-    final isPartialFillRecovery =
-        order.status == 'cancelled' &&
+    final isPartialFillRecovery = order.status == 'cancelled' &&
         _d(order.executedQuantity) > Decimal.zero;
     if (order.status != 'filled' && !isPartialFillRecovery) {
       throw StateError('父订单状态不是 filled 或已撤销部分成交: ${order.status}');
@@ -6548,10 +6621,10 @@ class AutoSpotGridExecutionService {
     if (qty <= Decimal.zero || order.gridLevelId == null) {
       throw StateError('父订单无有效成交数量或缺少 gridLevelId。');
     }
-    final grid =
-        await (db.select(
-          db.gridLevels,
-        )..where((tbl) => tbl.id.equals(order.gridLevelId!))).getSingleOrNull();
+    final grid = await (db.select(
+      db.gridLevels,
+    )..where((tbl) => tbl.id.equals(order.gridLevelId!)))
+        .getSingleOrNull();
     if (grid == null) {
       throw StateError('父订单关联网格不存在。');
     }
@@ -6569,14 +6642,13 @@ class AutoSpotGridExecutionService {
       replacementPrice: reversePrice,
     );
     if (existingReverse != null) {
-      final replacement =
-          _isLocalOnlyReplacementCandidate(existingReverse)
-              ? await _submitExistingReplacementOrder(
-                parent: order,
-                grid: grid,
-                replacement: existingReverse,
-              )
-              : existingReverse;
+      final replacement = _isLocalOnlyReplacementCandidate(existingReverse)
+          ? await _submitExistingReplacementOrder(
+              parent: order,
+              grid: grid,
+              replacement: existingReverse,
+            )
+          : existingReverse;
       await _linkExistingReplacementOrder(
         parent: order,
         grid: grid,
@@ -6601,8 +6673,8 @@ class AutoSpotGridExecutionService {
         'SELL 未成交期间不会创建新的 BUY。',
       );
     }
-    await (db.update(db.gridLevels)
-      ..where((tbl) => tbl.id.equals(grid.id))).write(
+    await (db.update(db.gridLevels)..where((tbl) => tbl.id.equals(grid.id)))
+        .write(
       GridLevelsCompanion(
         status: Value(order.side == 'BUY' ? 'buyFilled' : 'sellFilled'),
         lifecycleStatus: Value(
@@ -6654,12 +6726,11 @@ class AutoSpotGridExecutionService {
       lifecycleStatus:
           replacementSide == 'BUY' ? 'buySubmitting' : 'sellSubmitting',
     );
-    final created =
-        await (db.select(db.orders)
-              ..where((tbl) => tbl.parentOrderId.equals(order.id))
-              ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
-              ..limit(1))
-            .getSingleOrNull();
+    final created = await (db.select(db.orders)
+          ..where((tbl) => tbl.parentOrderId.equals(order.id))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
     if (created == null) {
       throw StateError('补单提交后未找到本地反向订单。');
     }
@@ -6667,10 +6738,9 @@ class AutoSpotGridExecutionService {
       strategyId: order.strategyId,
       level: 'info',
       module: 'AUTO_SPOT_GRID',
-      message:
-          manual
-              ? 'manual replacement order created'
-              : 'automatic replacement order created',
+      message: manual
+          ? 'manual replacement order created'
+          : 'automatic replacement order created',
       extraJson: jsonEncode({
         'parentOrderId': order.id,
         'replacementOrderId': created.id,
@@ -6739,8 +6809,7 @@ class AutoSpotGridExecutionService {
         strategyId: parent.strategyId,
         level: 'warning',
         module: 'AUTO_SPOT_GRID',
-        message:
-            'replacement SELL quantity capped by available balance: '
+        message: 'replacement SELL quantity capped by available balance: '
             'parent=${parent.id}, requested=$parentQty, adjusted=$quantity',
       );
     }
@@ -6754,22 +6823,21 @@ class AutoSpotGridExecutionService {
     if (_d(replacement.originalQuantity) == quantity) {
       return replacement;
     }
-    await (db.update(db.orders)
-      ..where((tbl) => tbl.id.equals(replacement.id))).write(
+    await (db.update(db.orders)..where((tbl) => tbl.id.equals(replacement.id)))
+        .write(
       OrdersCompanion(
         originalQuantity: Value(_s(quantity)),
         updatedAt: Value(DateTime.now().toUtc()),
       ),
     );
-    final updated =
-        await (db.select(db.orders)
-          ..where((tbl) => tbl.id.equals(replacement.id))).getSingleOrNull();
+    final updated = await (db.select(db.orders)
+          ..where((tbl) => tbl.id.equals(replacement.id)))
+        .getSingleOrNull();
     return updated ?? replacement;
   }
 
   Decimal? _gridBuyPrice(GridLevel level) {
-    final raw =
-        level.buyPrice ??
+    final raw = level.buyPrice ??
         (level.plannedSide == 'BUY' ? level.price : level.nextLowerPrice);
     if (raw == null) {
       return null;
@@ -6779,8 +6847,7 @@ class AutoSpotGridExecutionService {
   }
 
   Decimal? _gridSellPrice(GridLevel level) {
-    final raw =
-        level.sellPrice ??
+    final raw = level.sellPrice ??
         (level.plannedSide == 'BUY' ? level.nextUpperPrice : level.price);
     if (raw == null) {
       return null;
@@ -6790,20 +6857,21 @@ class AutoSpotGridExecutionService {
   }
 
   Future<int> _activeOrderCountForGrid(String gridLevelId) async {
-    final rows =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.gridLevelId.equals(gridLevelId) &
-              tbl.source.equals(source) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-                'cancelling',
-                'unknown',
-              ]),
-        )).get();
+    final rows = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(gridLevelId) &
+                tbl.source.equals(source) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                  'cancelling',
+                  'unknown',
+                ]),
+          ))
+        .get();
     return rows.length;
   }
 
@@ -6814,20 +6882,21 @@ class AutoSpotGridExecutionService {
   Future<List<Order>> _activeFuturesLongOrdersForGrid(
     String gridLevelId,
   ) async {
-    final rows =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.gridLevelId.equals(gridLevelId) &
-              tbl.source.equals(futuresLongSource) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-                'cancelling',
-                'unknown',
-              ]),
-        )).get();
+    final rows = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.gridLevelId.equals(gridLevelId) &
+                tbl.source.equals(futuresLongSource) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                  'cancelling',
+                  'unknown',
+                ]),
+          ))
+        .get();
     return rows
         .where((order) => !_isRepairableFuturesLongLocalOrder(order))
         .toList(growable: false);
@@ -6865,22 +6934,23 @@ class AutoSpotGridExecutionService {
     required Decimal price,
     String? excludingGridLevelId,
   }) async {
-    final rows =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.side.equals(side) &
-              tbl.price.equals(_s(price)) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-                'cancelling',
-                'unknown',
-              ]),
-        )).get();
+    final rows = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.side.equals(side) &
+                tbl.price.equals(_s(price)) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                  'cancelling',
+                  'unknown',
+                ]),
+          ))
+        .get();
     return rows.any((order) => order.gridLevelId != excludingGridLevelId);
   }
 
@@ -6891,14 +6961,15 @@ class AutoSpotGridExecutionService {
   }) async {
     final strategy = await _strategy(strategyId);
     final symbol = strategy?.symbol ?? 'BTCUSDT';
-    final exchangeOrders =
-        await (db.select(db.exchangeOpenOrders)..where(
-          (tbl) =>
-              tbl.environment.equals('live') &
-              tbl.marketType.equals('spot') &
-              tbl.symbol.equals(symbol) &
-              tbl.side.equals(side),
-        )).get();
+    final exchangeOrders = await (db.select(db.exchangeOpenOrders)
+          ..where(
+            (tbl) =>
+                tbl.environment.equals('live') &
+                tbl.marketType.equals('spot') &
+                tbl.symbol.equals(symbol) &
+                tbl.side.equals(side),
+          ))
+        .get();
     final samePriceOrders = exchangeOrders
         .where((order) => _d(order.price) == price)
         .toList(growable: false);
@@ -6916,20 +6987,21 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _detectDuplicateActiveGridOrders(String strategyId) async {
-    final rows =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-                'cancelling',
-                'unknown',
-              ]),
-        )).get();
+    final rows = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                  'cancelling',
+                  'unknown',
+                ]),
+          ))
+        .get();
     final groups = <String, List<Order>>{};
     for (final order in rows) {
       final key = '${order.side}|${order.price ?? '-'}';
@@ -6942,8 +7014,7 @@ class AutoSpotGridExecutionService {
     }
     final details = duplicates
         .map(
-          (orders) =>
-              '${orders.first.side} ${orders.first.price ?? '-'}: '
+          (orders) => '${orders.first.side} ${orders.first.price ?? '-'}: '
               '${orders.map((order) => order.clientOrderId).join(', ')}',
         )
         .join('; ');
@@ -6961,24 +7032,25 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _cancelStrategyOpenOrders(String strategyId) async {
-    final orders =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-              ]),
-        )).get();
+    final orders = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                ]),
+          ))
+        .get();
     for (final order in orders) {
       try {
         await liveExecution.cancelSpotOrder(order.clientOrderId);
       } catch (_) {
-        await (db.update(db.orders)
-          ..where((tbl) => tbl.id.equals(order.id))).write(
+        await (db.update(db.orders)..where((tbl) => tbl.id.equals(order.id)))
+            .write(
           OrdersCompanion(
             status: const Value('unknown'),
             updatedAt: Value(DateTime.now().toUtc()),
@@ -6997,10 +7069,9 @@ class AutoSpotGridExecutionService {
     final current = ticker.midPrice;
     final lower = _d(strategy.lowerPrice);
     final upper = _d(strategy.upperPrice);
-    final side =
-        current < lower
-            ? 'lower'
-            : current > upper
+    final side = current < lower
+        ? 'lower'
+        : current > upper
             ? 'upper'
             : null;
     if (side == null) {
@@ -7054,18 +7125,19 @@ class AutoSpotGridExecutionService {
   }
 
   Future<int> _openOrderCount(String strategyId) async {
-    final rows =
-        await (db.select(db.orders)..where(
-          (tbl) =>
-              tbl.strategyId.equals(strategyId) &
-              tbl.source.equals(source) &
-              tbl.status.isIn([
-                'created',
-                'submitting',
-                'new',
-                'partiallyFilled',
-              ]),
-        )).get();
+    final rows = await (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source.equals(source) &
+                tbl.status.isIn([
+                  'created',
+                  'submitting',
+                  'new',
+                  'partiallyFilled',
+                ]),
+          ))
+        .get();
     return rows.length;
   }
 
@@ -7084,11 +7156,13 @@ class AutoSpotGridExecutionService {
   }
 
   Future<AccountAsset?> _latestAccountAsset(String asset) {
-    return (db.select(db.accountAssets)..where(
-      (tbl) =>
-          tbl.accountType.equals('spotSubAccount') &
-          tbl.asset.equals(asset.toUpperCase()),
-    )).getSingleOrNull();
+    return (db.select(db.accountAssets)
+          ..where(
+            (tbl) =>
+                tbl.accountType.equals('spotSubAccount') &
+                tbl.asset.equals(asset.toUpperCase()),
+          ))
+        .getSingleOrNull();
   }
 
   Decimal _assetFree(AccountAsset? row) =>
@@ -7101,8 +7175,8 @@ class AutoSpotGridExecutionService {
       row == null ? Decimal.zero : _d(row.total);
 
   Future<Strategy?> _strategy(String strategyId) {
-    return (db.select(db.strategies)
-      ..where((tbl) => tbl.id.equals(strategyId))).getSingleOrNull();
+    return (db.select(db.strategies)..where((tbl) => tbl.id.equals(strategyId)))
+        .getSingleOrNull();
   }
 
   Future<void> _setStatus(
@@ -7112,8 +7186,8 @@ class AutoSpotGridExecutionService {
     DateTime? stoppedAt,
     String? lastError,
   }) async {
-    await (db.update(db.strategies)
-      ..where((tbl) => tbl.id.equals(strategyId))).write(
+    await (db.update(db.strategies)..where((tbl) => tbl.id.equals(strategyId)))
+        .write(
       StrategiesCompanion(
         status: Value(status),
         startedAt: startedAt == null ? const Value.absent() : Value(startedAt),
@@ -7130,8 +7204,8 @@ class AutoSpotGridExecutionService {
     DateTime? startedAt,
     DateTime? stoppedAt,
   }) async {
-    await (db.update(db.strategies)
-      ..where((tbl) => tbl.id.equals(strategyId))).write(
+    await (db.update(db.strategies)..where((tbl) => tbl.id.equals(strategyId)))
+        .write(
       StrategiesCompanion(
         status: Value(status),
         startedAt: startedAt == null ? const Value.absent() : Value(startedAt),
@@ -7147,16 +7221,16 @@ class AutoSpotGridExecutionService {
   }
 
   Future<void> _recalculateStrategyBtc(String strategyId) async {
-    final fills =
-        await (db.select(db.fills)
-          ..where((tbl) => tbl.strategyId.equals(strategyId))).get();
+    final fills = await (db.select(db.fills)
+          ..where((tbl) => tbl.strategyId.equals(strategyId)))
+        .get();
     var btc = Decimal.zero;
     for (final fill in fills) {
       final qty = _d(fill.quantity);
       btc += fill.side == 'BUY' ? qty : -qty;
     }
-    await (db.update(db.strategies)
-      ..where((tbl) => tbl.id.equals(strategyId))).write(
+    await (db.update(db.strategies)..where((tbl) => tbl.id.equals(strategyId)))
+        .write(
       StrategiesCompanion(
         strategySpotBtc: Value(_s(btc)),
         updatedAt: Value(DateTime.now().toUtc()),
@@ -7170,9 +7244,7 @@ class AutoSpotGridExecutionService {
     String level,
     String message,
   ) async {
-    await db
-        .into(db.riskEvents)
-        .insert(
+    await db.into(db.riskEvents).insert(
           RiskEventsCompanion.insert(
             id: _uuid.v4(),
             strategyId: strategyId,
@@ -7189,9 +7261,7 @@ class AutoSpotGridExecutionService {
     String strategyId,
     LiveSpotGridEditableConfig config,
   ) async {
-    await db
-        .into(db.appSettings)
-        .insertOnConflictUpdate(
+    await db.into(db.appSettings).insertOnConflictUpdate(
           AppSettingsCompanion.insert(
             key: _configKey(strategyId),
             value: jsonEncode(config.toJson()),

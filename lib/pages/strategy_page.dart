@@ -53,16 +53,14 @@ class _StrategyPageState extends State<StrategyPage> {
     }
     final isFuturesGrid =
         executionMode == LiveSpotGridEditableConfig.futuresGridHedge;
-    final center =
-        Decimal.tryParse(active.lastTickerPrice ?? '') ??
+    final center = Decimal.tryParse(active.lastTickerPrice ?? '') ??
         Decimal.fromInt(60000);
     final config = LiveSpotGridEditableConfig.defaults(
       centerPrice: center,
       symbol: active.symbol,
-      name:
-          isFuturesGrid
-              ? '${active.symbol} LIVE Futures Long Grid'
-              : '${active.symbol} LIVE Spot Grid',
+      name: isFuturesGrid
+          ? '${active.symbol} LIVE Futures Long Grid'
+          : '${active.symbol} LIVE Spot Grid',
       spotCapital: await _liveGrid.capitalLimit(symbol: active.symbol),
       executionMode: executionMode,
     );
@@ -80,11 +78,8 @@ class _StrategyPageState extends State<StrategyPage> {
   Future<void> _preflight(Strategy strategy) async {
     final result = await _liveGrid.preflight(strategy.id);
     setState(
-      () =>
-          _liveMessage =
-              result.ok
-                  ? '启动前检查通过。'
-                  : '启动前检查失败:\n${_issuesText(result.issues)}',
+      () => _liveMessage =
+          result.ok ? '启动前检查通过。' : '启动前检查失败:\n${_issuesText(result.issues)}',
     );
   }
 
@@ -121,33 +116,28 @@ class _StrategyPageState extends State<StrategyPage> {
       }
       await _liveGrid.updateEditableConfig(strategy.id, edited);
       final saved = await _liveGrid.loadEditableConfig(strategy.id);
-      final leverageText =
-          saved?.isFuturesGridHedge == true
-              ? ' 合约杠杆: ${saved?.futuresLeverage ?? edited.futuresLeverage}x。'
-              : '';
-      final longEntryTriggerText =
-          saved?.isFuturesGridHedge == true
-              ? ' 开多提前触发: ${saved?.longEntryTriggerDistanceUsdt ?? edited.longEntryTriggerDistanceUsdt} USDT。'
-              : '';
-      final shortHedgeText =
-          saved?.enableFutureHedgeGrid == true ||
-                  saved?.isFuturesGridHedge == true
-              ? ' SHORT对冲: ${saved?.shortHedgeMultiplier ?? edited.shortHedgeMultiplier}x / 均摊${saved?.shortHedgeSpreadLevels ?? edited.shortHedgeSpreadLevels}层。'
-              : '';
+      final leverageText = saved?.isFuturesGridHedge == true
+          ? ' 合约杠杆: ${saved?.futuresLeverage ?? edited.futuresLeverage}x。'
+          : '';
+      final longEntryTriggerText = saved?.isFuturesGridHedge == true
+          ? ' 开多提前触发: ${saved?.longEntryTriggerDistanceUsdt ?? edited.longEntryTriggerDistanceUsdt} USDT。'
+          : '';
+      final shortHedgeText = saved?.enableFutureHedgeGrid == true ||
+              saved?.isFuturesGridHedge == true
+          ? ' SHORT对冲: ${saved?.shortHedgeMultiplier ?? edited.shortHedgeMultiplier}x / 均摊${saved?.shortHedgeSpreadLevels ?? edited.shortHedgeSpreadLevels}层。'
+          : '';
       setState(
-        () =>
-            _liveMessage =
-                '策略配置已保存，并已重新生成本地网格计划。$leverageText$longEntryTriggerText$shortHedgeText',
+        () => _liveMessage =
+            '策略配置已保存，并已重新生成本地网格计划。$leverageText$longEntryTriggerText$shortHedgeText',
       );
     } catch (error) {
       final savedParts = [
         if (shortHedgeSaved) 'SHORT对冲参数已保存',
         if (leverageSaved) '合约杠杆已保存',
       ];
-      final prefix =
-          savedParts.isEmpty
-              ? '策略配置保存失败'
-              : '${savedParts.join('，')}，其它策略配置保存失败';
+      final prefix = savedParts.isEmpty
+          ? '策略配置保存失败'
+          : '${savedParts.join('，')}，其它策略配置保存失败';
       setState(() => _liveMessage = '$prefix：$error');
     }
   }
@@ -180,9 +170,8 @@ class _StrategyPageState extends State<StrategyPage> {
       await _liveGrid.updateFuturesLeverage(strategy.id, leverage);
       final saved = await _liveGrid.loadEditableConfig(strategy.id);
       setState(
-        () =>
-            _liveMessage =
-                '合约杠杆倍数已保存为 ${saved?.futuresLeverage ?? leverage.clamp(1, 125)}x。',
+        () => _liveMessage =
+            '合约杠杆倍数已保存为 ${saved?.futuresLeverage ?? leverage.clamp(1, 125)}x。',
       );
     } catch (error) {
       setState(() => _liveMessage = '合约杠杆倍数保存失败：$error');
@@ -205,9 +194,8 @@ class _StrategyPageState extends State<StrategyPage> {
       );
       final saved = await _liveGrid.loadEditableConfig(strategy.id);
       setState(
-        () =>
-            _liveMessage =
-                'SHORT 对冲参数已保存：${saved?.shortHedgeMultiplier ?? settings.multiplier}x / 均摊 ${saved?.shortHedgeSpreadLevels ?? settings.spreadLevels} 层。',
+        () => _liveMessage =
+            'SHORT 对冲参数已保存：${saved?.shortHedgeMultiplier ?? settings.multiplier}x / 均摊 ${saved?.shortHedgeSpreadLevels ?? settings.spreadLevels} 层。',
       );
     } catch (error) {
       setState(() => _liveMessage = 'SHORT 对冲参数保存失败：$error');
@@ -226,21 +214,20 @@ class _StrategyPageState extends State<StrategyPage> {
   Future<void> _deleteLiveStrategy(Strategy strategy) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('删除策略'),
-            content: const Text('只允许删除没有订单记录的未运行策略。确认删除当前本地策略和网格计划？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认删除'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('删除策略'),
+        content: const Text('只允许删除没有订单记录的未运行策略。确认删除当前本地策略和网格计划？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -254,23 +241,22 @@ class _StrategyPageState extends State<StrategyPage> {
   Future<void> _archiveCurrentStrategy(Strategy strategy) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('归档当前策略'),
-            content: const Text(
-              '归档后该策略会变成旧策略，订单、成交和审计记录保留；Grid 和 Grid Future 将不再显示该策略网格。归档前策略必须已停止或满足安全停止条件。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认归档'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('归档当前策略'),
+        content: const Text(
+          '归档后该策略会变成旧策略，订单、成交和审计记录保留；Grid 和 Grid Future 将不再显示该策略网格。归档前策略必须已停止或满足安全停止条件。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认归档'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -285,24 +271,23 @@ class _StrategyPageState extends State<StrategyPage> {
     final directionText = up ? '上移' : '下移';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('网格$directionText一格'),
-            content: Text(
-              '将在当前策略内按网格宽度$directionText一格，不归档策略、不移动历史订单。'
-              '如果即将移出区间的边缘网格存在订单、完成循环或未处理空单价格层，操作会被阻止。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text('确认$directionText'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text('网格$directionText一格'),
+        content: Text(
+          '将在当前策略内按网格宽度$directionText一格，不归档策略、不移动历史订单。'
+          '如果即将移出区间的边缘网格存在订单、完成循环或未处理空单价格层，操作会被阻止。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('确认$directionText'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -318,54 +303,53 @@ class _StrategyPageState extends State<StrategyPage> {
     try {
       final confirmed = await showDialog<bool>(
         context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('重置测试环境'),
-              content: SizedBox(
-                width: 620,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '该操作会撤销当前现货子账户内本程序 LIVE 挂单，并归档本地所有 LIVE 现货网格策略。',
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('不会删除历史订单和成交记录。'),
-                    const Text('不会卖出任何资产。'),
-                    const Text('如果任意撤单失败，本地策略不会被归档。'),
-                    const SizedBox(height: 12),
-                    const Text('请输入 RESET 确认：'),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'RESET',
-                      ),
-                    ),
-                  ],
+        builder: (context) => AlertDialog(
+          title: const Text('重置测试环境'),
+          content: SizedBox(
+            width: 620,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '该操作会撤销当前现货子账户内本程序 LIVE 挂单，并归档本地所有 LIVE 现货网格策略。',
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red.shade700,
+                const SizedBox(height: 8),
+                const Text('不会删除历史订单和成交记录。'),
+                const Text('不会卖出任何资产。'),
+                const Text('如果任意撤单失败，本地策略不会被归档。'),
+                const SizedBox(height: 12),
+                const Text('请输入 RESET 确认：'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'RESET',
                   ),
-                  onPressed: () {
-                    Navigator.of(
-                      context,
-                    ).pop(controller.text.trim() == 'RESET');
-                  },
-                  child: const Text('撤销订单并归档策略'),
                 ),
               ],
             ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+              ),
+              onPressed: () {
+                Navigator.of(
+                  context,
+                ).pop(controller.text.trim() == 'RESET');
+              },
+              child: const Text('撤销订单并归档策略'),
+            ),
+          ],
+        ),
       );
       if (confirmed != true) {
         setState(() => _liveMessage = '已取消重置测试环境。');
@@ -387,12 +371,11 @@ class _StrategyPageState extends State<StrategyPage> {
       if (!mounted) return;
       final result = await showDialog<(Decimal, Decimal)>(
         context: context,
-        builder:
-            (context) => _BtcInventoryDialog(
-              inventory: inventory,
-              baseAsset: baseAsset,
-              defaultExternalAll: true,
-            ),
+        builder: (context) => _BtcInventoryDialog(
+          inventory: inventory,
+          baseAsset: baseAsset,
+          defaultExternalAll: true,
+        ),
       );
       if (result == null) return;
       await _liveGrid.confirmBtcInventory(
@@ -401,9 +384,8 @@ class _StrategyPageState extends State<StrategyPage> {
         externalBtc: result.$2,
       );
       setState(
-        () =>
-            _liveMessage =
-                '$baseAsset 归属已确认：strategy$baseAsset=${result.$1}, external$baseAsset=${result.$2}',
+        () => _liveMessage =
+            '$baseAsset 归属已确认：strategy$baseAsset=${result.$1}, external$baseAsset=${result.$2}',
       );
     } catch (error) {
       setState(() => _liveMessage = '确认资产归属失败：$error');
@@ -414,131 +396,89 @@ class _StrategyPageState extends State<StrategyPage> {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder:
-          (context) => StatefulBuilder(
-            builder: (context, setDialogState) {
-              Future<List<LiveSpotGridConflict>> load() =>
-                  _liveGrid.conflictingLiveStrategies(strategy.id);
-              return AlertDialog(
-                title: const Text('冲突策略处理'),
-                content: SizedBox(
-                  width: 920,
-                  child: FutureBuilder<List<LiveSpotGridConflict>>(
-                    future: load(),
-                    builder: (context, snapshot) {
-                      final conflicts = snapshot.data ?? const [];
-                      if (snapshot.connectionState != ConnectionState.done) {
-                        return const SizedBox(
-                          height: 120,
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      if (conflicts.isEmpty) {
-                        return const Text('没有发现冲突策略。');
-                      }
-                      return SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                await _batchCleanConflicts(strategy.id);
-                                if (context.mounted) setDialogState(() {});
-                              },
-                              icon: const Icon(Icons.cleaning_services),
-                              label: const Text('检查并清理无活动订单的旧策略'),
-                            ),
-                            const SizedBox(height: 8),
-                            for (final item in conflicts)
-                              _ConflictStrategyCard(
-                                item: item,
-                                onOpen: () {
-                                  setState(
-                                    () =>
-                                        _liveMessage =
-                                            '冲突策略ID：${item.strategyId}',
-                                  );
-                                },
-                                onReconcile: () async {
-                                  await _liveGrid.reconcile(item.strategyId);
-                                  setDialogState(() {});
-                                },
-                                onOrders:
-                                    () => _showStrategyOrders(item.strategyId),
-                                onExchangeOrders:
-                                    () => _showStrategyExchangeOrders(
-                                      item.strategyId,
-                                    ),
-                                onFills:
-                                    () => _showStrategyFills(item.strategyId),
-                                onBtc:
-                                    () => _showOldStrategyBtcDialog(
-                                      item.strategyId,
-                                    ),
-                                onSafeStop: () async {
-                                  await _liveGrid.stop(item.strategyId);
-                                  setDialogState(() {});
-                                },
-                                onCancelExchangeOrders: () async {
-                                  await _liveGrid
-                                      .cancelStrategyExchangeOpenOrders(
-                                        item.strategyId,
-                                      );
-                                  setDialogState(() {});
-                                },
-                                onMarkStopped: () async {
-                                  await _liveGrid
-                                      .markStoppedAfterNoExchangeOrders(
-                                        item.strategyId,
-                                      );
-                                  setDialogState(() {});
-                                },
-                                onArchive: () async {
-                                  await _liveGrid.archiveStoppedStrategy(
-                                    item.strategyId,
-                                  );
-                                  setDialogState(() {});
-                                },
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('关闭'),
-                  ),
-                ],
-              );
-            },
-          ),
-    );
-  }
-
-  Future<void> _showStrategyOrders(String strategyId) async {
-    final orders = await _liveGrid.strategyOrders(strategyId);
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('策略订单'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<List<LiveSpotGridConflict>> load() =>
+              _liveGrid.conflictingLiveStrategies(strategy.id);
+          return AlertDialog(
+            title: const Text('冲突策略处理'),
             content: SizedBox(
-              width: 820,
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  orders.isEmpty
-                      ? '没有本地订单。'
-                      : orders
-                          .map(
-                            (o) =>
-                                '${o.status} ${o.side} ${o.orderType} price=${o.price ?? '-'} qty=${o.originalQuantity} executed=${o.executedQuantity} client=${o.clientOrderId} exchange=${o.exchangeOrderId ?? '-'}',
-                          )
-                          .join('\n'),
-                ),
+              width: 920,
+              child: FutureBuilder<List<LiveSpotGridConflict>>(
+                future: load(),
+                builder: (context, snapshot) {
+                  final conflicts = snapshot.data ?? const [];
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const SizedBox(
+                      height: 120,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (conflicts.isEmpty) {
+                    return const Text('没有发现冲突策略。');
+                  }
+                  return SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await _batchCleanConflicts(strategy.id);
+                            if (context.mounted) setDialogState(() {});
+                          },
+                          icon: const Icon(Icons.cleaning_services),
+                          label: const Text('检查并清理无活动订单的旧策略'),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final item in conflicts)
+                          _ConflictStrategyCard(
+                            item: item,
+                            onOpen: () {
+                              setState(
+                                () =>
+                                    _liveMessage = '冲突策略ID：${item.strategyId}',
+                              );
+                            },
+                            onReconcile: () async {
+                              await _liveGrid.reconcile(item.strategyId);
+                              setDialogState(() {});
+                            },
+                            onOrders: () =>
+                                _showStrategyOrders(item.strategyId),
+                            onExchangeOrders: () => _showStrategyExchangeOrders(
+                              item.strategyId,
+                            ),
+                            onFills: () => _showStrategyFills(item.strategyId),
+                            onBtc: () => _showOldStrategyBtcDialog(
+                              item.strategyId,
+                            ),
+                            onSafeStop: () async {
+                              await _liveGrid.stop(item.strategyId);
+                              setDialogState(() {});
+                            },
+                            onCancelExchangeOrders: () async {
+                              await _liveGrid.cancelStrategyExchangeOpenOrders(
+                                item.strategyId,
+                              );
+                              setDialogState(() {});
+                            },
+                            onMarkStopped: () async {
+                              await _liveGrid.markStoppedAfterNoExchangeOrders(
+                                item.strategyId,
+                              );
+                              setDialogState(() {});
+                            },
+                            onArchive: () async {
+                              await _liveGrid.archiveStoppedStrategy(
+                                item.strategyId,
+                              );
+                              setDialogState(() {});
+                            },
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
             actions: [
@@ -547,7 +487,41 @@ class _StrategyPageState extends State<StrategyPage> {
                 child: const Text('关闭'),
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showStrategyOrders(String strategyId) async {
+    final orders = await _liveGrid.strategyOrders(strategyId);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('策略订单'),
+        content: SizedBox(
+          width: 820,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              orders.isEmpty
+                  ? '没有本地订单。'
+                  : orders
+                      .map(
+                        (o) =>
+                            '${o.status} ${o.side} ${o.orderType} price=${o.price ?? '-'} qty=${o.originalQuantity} executed=${o.executedQuantity} client=${o.clientOrderId} exchange=${o.exchangeOrderId ?? '-'}',
+                      )
+                      .join('\n'),
+            ),
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -557,31 +531,30 @@ class _StrategyPageState extends State<StrategyPage> {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Binance 当前挂单'),
-            content: SizedBox(
-              width: 860,
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  orders.isEmpty
-                      ? 'Binance 当前没有本程序关联的当前策略现货挂单。'
-                      : orders
-                          .map(
-                            (o) =>
-                                '${o.status} ${o.side} ${o.orderType} price=${o.price} qty=${o.originalQuantity} executed=${o.executedQuantity} client=${o.clientOrderId} exchange=${o.exchangeOrderId}',
-                          )
-                          .join('\n'),
-                ),
-              ),
+      builder: (context) => AlertDialog(
+        title: const Text('Binance 当前挂单'),
+        content: SizedBox(
+          width: 860,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              orders.isEmpty
+                  ? 'Binance 当前没有本程序关联的当前策略现货挂单。'
+                  : orders
+                      .map(
+                        (o) =>
+                            '${o.status} ${o.side} ${o.orderType} price=${o.price} qty=${o.originalQuantity} executed=${o.executedQuantity} client=${o.clientOrderId} exchange=${o.exchangeOrderId}',
+                      )
+                      .join('\n'),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('关闭'),
-              ),
-            ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -590,81 +563,78 @@ class _StrategyPageState extends State<StrategyPage> {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('策略成交'),
-            content: SizedBox(
-              width: 720,
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  fills.isEmpty
-                      ? '没有成交。'
-                      : fills
-                          .map(
-                            (f) =>
-                                '${f.tradeTime.toLocal()} ${f.side} price=${f.price} qty=${f.quantity} quote=${f.quoteQuantity} fee=${f.commission} ${f.commissionAsset}',
-                          )
-                          .join('\n'),
-                ),
-              ),
+      builder: (context) => AlertDialog(
+        title: const Text('策略成交'),
+        content: SizedBox(
+          width: 720,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              fills.isEmpty
+                  ? '没有成交。'
+                  : fills
+                      .map(
+                        (f) =>
+                            '${f.tradeTime.toLocal()} ${f.side} price=${f.price} qty=${f.quantity} quote=${f.quoteQuantity} fee=${f.commission} ${f.commissionAsset}',
+                      )
+                      .join('\n'),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('关闭'),
-              ),
-            ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _showOldStrategyBtcDialog(String strategyId) async {
-    final strategy =
-        await (_liveGrid.db.select(_liveGrid.db.strategies)
-          ..where((tbl) => tbl.id.equals(strategyId))).getSingleOrNull();
+    final strategy = await (_liveGrid.db.select(_liveGrid.db.strategies)
+          ..where((tbl) => tbl.id.equals(strategyId)))
+        .getSingleOrNull();
     if (!mounted || strategy == null) return;
     final btc = Decimal.tryParse(strategy.strategySpotBtc) ?? Decimal.zero;
     await showDialog<void>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('旧策略资产处理'),
-            content: SizedBox(
-              width: 560,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SelectableText('strategyId: $strategyId'),
-                  Text('策略资产: $btc'),
-                  const SizedBox(height: 8),
-                  const Text('默认 E：暂不处理。strategyBtc 不为 0 时不能直接清理旧策略。'),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('E 暂不处理'),
-              ),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('A 保留为旧策略资产'),
-              ),
-              FilledButton(
-                onPressed:
-                    btc <= Decimal.zero
-                        ? null
-                        : () async {
-                          await _liveGrid.moveStrategyBtcToExternal(strategyId);
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                child: const Text('B 转为 externalBtc'),
-              ),
-              const OutlinedButton(onPressed: null, child: Text('C 转给新策略')),
-              const OutlinedButton(onPressed: null, child: Text('D 卖出策略资产')),
+      builder: (context) => AlertDialog(
+        title: const Text('旧策略资产处理'),
+        content: SizedBox(
+          width: 560,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText('strategyId: $strategyId'),
+              Text('策略资产: $btc'),
+              const SizedBox(height: 8),
+              const Text('默认 E：暂不处理。strategyBtc 不为 0 时不能直接清理旧策略。'),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('E 暂不处理'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('A 保留为旧策略资产'),
+          ),
+          FilledButton(
+            onPressed: btc <= Decimal.zero
+                ? null
+                : () async {
+                    await _liveGrid.moveStrategyBtcToExternal(strategyId);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+            child: const Text('B 转为 externalBtc'),
+          ),
+          const OutlinedButton(onPressed: null, child: Text('C 转给新策略')),
+          const OutlinedButton(onPressed: null, child: Text('D 卖出策略资产')),
+        ],
+      ),
     );
   }
 
@@ -677,66 +647,62 @@ class _StrategyPageState extends State<StrategyPage> {
     final selected = <String>{for (final item in safe) item.strategyId};
     await showDialog<void>(
       context: context,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setDialogState) => AlertDialog(
-                  title: const Text('批量清理无活动订单的旧策略'),
-                  content: SizedBox(
-                    width: 760,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (safe.isEmpty)
-                            const Text('没有满足安全条件的旧策略。')
-                          else
-                            for (final item in safe)
-                              CheckboxListTile(
-                                value: selected.contains(item.strategyId),
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    if (value == true) {
-                                      selected.add(item.strategyId);
-                                    } else {
-                                      selected.remove(item.strategyId);
-                                    }
-                                  });
-                                },
-                                title: Text(item.strategyId),
-                                subtitle: Text(
-                                  '状态=${item.status}, strategyBtc=${item.strategyBtc}, Binance挂单=${item.binanceActiveOrders}, 本地活动=${item.localActiveOrders}',
-                                ),
-                              ),
-                          const Divider(),
-                          const Text('不会删除历史订单和成交数据，只把勾选策略状态改为 stopped。'),
-                        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('批量清理无活动订单的旧策略'),
+          content: SizedBox(
+            width: 760,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (safe.isEmpty)
+                    const Text('没有满足安全条件的旧策略。')
+                  else
+                    for (final item in safe)
+                      CheckboxListTile(
+                        value: selected.contains(item.strategyId),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            if (value == true) {
+                              selected.add(item.strategyId);
+                            } else {
+                              selected.remove(item.strategyId);
+                            }
+                          });
+                        },
+                        title: Text(item.strategyId),
+                        subtitle: Text(
+                          '状态=${item.status}, strategyBtc=${item.strategyBtc}, Binance挂单=${item.binanceActiveOrders}, 本地活动=${item.localActiveOrders}',
+                        ),
                       ),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('取消'),
-                    ),
-                    FilledButton(
-                      onPressed:
-                          selected.isEmpty
-                              ? null
-                              : () async {
-                                for (final id in selected) {
-                                  await _liveGrid
-                                      .markStoppedAfterNoExchangeOrders(id);
-                                }
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                      child: const Text('确认批量标记 stopped'),
-                    ),
-                  ],
-                ),
+                  const Divider(),
+                  const Text('不会删除历史订单和成交数据，只把勾选策略状态改为 stopped。'),
+                ],
+              ),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () async {
+                      for (final id in selected) {
+                        await _liveGrid.markStoppedAfterNoExchangeOrders(id);
+                      }
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+              child: const Text('确认批量标记 stopped'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -777,23 +743,22 @@ class _StrategyPageState extends State<StrategyPage> {
     final displaySymbol = _displaySymbol(strategy.symbol);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('启动 LIVE 现货网格'),
-            content: Text(
-              '这会在正式币安现货账户自动提交 $displaySymbol 网格订单，并可能建立初始 $baseAsset 库存。确认继续？',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认启动 LIVE 网格'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('启动 LIVE 现货网格'),
+        content: Text(
+          '这会在正式币安现货账户自动提交 $displaySymbol 网格订单，并可能建立初始 $baseAsset 库存。确认继续？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认启动 LIVE 网格'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     if (!mounted) return;
@@ -804,24 +769,23 @@ class _StrategyPageState extends State<StrategyPage> {
   Future<void> _startFuturesLongGrid(Strategy strategy) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('启动 LIVE 合约 LONG 网格'),
-            content: Text(
-              '这会在 Binance Futures 为 ${_displaySymbol(strategy.symbol)} 提交 LONG BUY 限价挂单。'
-              '资金来自合约账户，SHORT 对冲仍按价格层成交触发。确认继续？',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认启动合约网格'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('启动 LIVE 合约 LONG 网格'),
+        content: Text(
+          '这会在 Binance Futures 为 ${_displaySymbol(strategy.symbol)} 提交 LONG BUY 限价挂单。'
+          '资金来自合约账户，SHORT 对冲仍按价格层成交触发。确认继续？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认启动合约网格'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -839,24 +803,23 @@ class _StrategyPageState extends State<StrategyPage> {
   Future<void> _recoverFuturesLongGrid(Strategy strategy) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('恢复并对账 LONG 网格'),
-            content: Text(
-              '这会刷新 Binance Futures 订单、挂单和仓位，并按交易所真实状态恢复 ${_displaySymbol(strategy.symbol)} 的 LONG 网格。'
-              '如果没有仍需处理的异常，会把策略恢复为 running 并清空旧错误。确认继续？',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认恢复并对账'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('恢复并对账 LONG 网格'),
+        content: Text(
+          '这会刷新 Binance Futures 订单、挂单和仓位，并按交易所真实状态恢复 ${_displaySymbol(strategy.symbol)} 的 LONG 网格。'
+          '如果没有仍需处理的异常，会把策略恢复为 running 并清空旧错误。确认继续？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认恢复并对账'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -907,15 +870,13 @@ class _StrategyPageState extends State<StrategyPage> {
           },
         );
         final report = await _liveGrid.buildRecoveryReport(strategy.id);
-        result =
-            'LIVE 网格已启动\n'
+        result = 'LIVE 网格已启动\n'
             '当前活动挂单数：${report.localOpenOrders}\n'
             'strategy$baseAsset：${report.strategyBtc}\n'
             '启动时间：${DateTime.now().toLocal()}';
       } catch (error) {
         issues = await _liveGrid.preflightIssues(strategy.id);
-        result =
-            'LIVE 网格启动失败\n'
+        result = 'LIVE 网格启动失败\n'
             '失败信息：${_friendlyStartError(error)}\n'
             '如果已有部分订单提交，策略将进入对账/暂停状态，请执行恢复报告。';
         if (dialogContext.mounted) {
@@ -943,8 +904,7 @@ class _StrategyPageState extends State<StrategyPage> {
               // ignore: use_build_context_synchronously
               Future<void>(() => runStart(dialogContext, setDialogState));
             }
-            final done =
-                steps['启动完成'] == 'success' ||
+            final done = steps['启动完成'] == 'success' ||
                 result.startsWith('LIVE 网格启动失败') ||
                 steps.values.contains('failed');
             return AlertDialog(
@@ -1007,19 +967,18 @@ class _StrategyPageState extends State<StrategyPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed:
-                      done
-                          ? () async {
-                            for (final key in steps.keys.toList()) {
-                              steps[key] = 'pending';
-                            }
-                            result = '启动流程已执行。';
-                            detail = '';
-                            issues = [];
-                            setDialogState(() {});
-                            await runStart(dialogContext, setDialogState);
+                  onPressed: done
+                      ? () async {
+                          for (final key in steps.keys.toList()) {
+                            steps[key] = 'pending';
                           }
-                          : null,
+                          result = '启动流程已执行。';
+                          detail = '';
+                          issues = [];
+                          setDialogState(() {});
+                          await runStart(dialogContext, setDialogState);
+                        }
+                      : null,
                   child: const Text('重新运行检查'),
                 ),
                 FilledButton(
@@ -1125,115 +1084,91 @@ class _StrategyPageState extends State<StrategyPage> {
                 if (!hideSpotUi) ...[
                   StreamBuilder<Strategy?>(
                     stream: _liveGrid.watchActiveStrategy(symbol: symbol),
-                    builder:
-                        (context, snapshot) => _LiveSpotGridSection(
-                          strategy: snapshot.data,
-                          liveGrid: _liveGrid,
-                          message: _liveMessage,
-                          onCreateSpot:
-                              () => _createLiveStrategy(
-                                executionMode:
-                                    LiveSpotGridEditableConfig
-                                        .spotGridFuturesHedge,
+                    builder: (context, snapshot) => _LiveSpotGridSection(
+                      strategy: snapshot.data,
+                      liveGrid: _liveGrid,
+                      message: _liveMessage,
+                      onCreateSpot: () => _createLiveStrategy(
+                        executionMode:
+                            LiveSpotGridEditableConfig.spotGridFuturesHedge,
+                      ),
+                      onEdit: snapshot.data == null
+                          ? null
+                          : () => _editLiveStrategy(snapshot.data!),
+                      onEditMaxOpenOrders: snapshot.data == null
+                          ? null
+                          : () => _editMaxOpenOrders(snapshot.data!),
+                      onCopy: snapshot.data == null
+                          ? null
+                          : () => _copyLiveStrategy(snapshot.data!),
+                      onDelete: snapshot.data == null
+                          ? null
+                          : () => _deleteLiveStrategy(snapshot.data!),
+                      onArchiveCurrent: snapshot.data == null
+                          ? null
+                          : () => _archiveCurrentStrategy(snapshot.data!),
+                      onMoveUp: snapshot.data == null
+                          ? null
+                          : () => _moveGridBand(snapshot.data!, up: true),
+                      onMoveDown: snapshot.data == null
+                          ? null
+                          : () => _moveGridBand(snapshot.data!, up: false),
+                      onConfirmBtc: snapshot.data == null
+                          ? null
+                          : () => _confirmBtcInventory(snapshot.data!),
+                      onPreflight: snapshot.data == null
+                          ? null
+                          : () => _preflight(snapshot.data!),
+                      onDryRun: snapshot.data == null
+                          ? null
+                          : () => _dryRun(snapshot.data!),
+                      onStart: snapshot.data == null
+                          ? null
+                          : () => _startLive(snapshot.data!),
+                      onPauseKeep: snapshot.data == null
+                          ? null
+                          : () => _runLiveAction(
+                                '已暂停：保留挂单。',
+                                () => _liveGrid.pauseKeepOrders(
+                                  snapshot.data!.id,
+                                ),
                               ),
-                          onEdit:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _editLiveStrategy(snapshot.data!),
-                          onEditMaxOpenOrders:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _editMaxOpenOrders(snapshot.data!),
-                          onCopy:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _copyLiveStrategy(snapshot.data!),
-                          onDelete:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _deleteLiveStrategy(snapshot.data!),
-                          onArchiveCurrent:
-                              snapshot.data == null
-                                  ? null
-                                  : () =>
-                                      _archiveCurrentStrategy(snapshot.data!),
-                          onMoveUp:
-                              snapshot.data == null
-                                  ? null
-                                  : () =>
-                                      _moveGridBand(snapshot.data!, up: true),
-                          onMoveDown:
-                              snapshot.data == null
-                                  ? null
-                                  : () =>
-                                      _moveGridBand(snapshot.data!, up: false),
-                          onConfirmBtc:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _confirmBtcInventory(snapshot.data!),
-                          onPreflight:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _preflight(snapshot.data!),
-                          onDryRun:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _dryRun(snapshot.data!),
-                          onStart:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _startLive(snapshot.data!),
-                          onPauseKeep:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _runLiveAction(
-                                    '已暂停：保留挂单。',
-                                    () => _liveGrid.pauseKeepOrders(
-                                      snapshot.data!.id,
-                                    ),
-                                  ),
-                          onPauseCancel:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _runLiveAction(
-                                    '已暂停：已请求撤销策略挂单。',
-                                    () => _liveGrid.pauseCancelOrders(
-                                      snapshot.data!.id,
-                                    ),
-                                  ),
-                          onResume:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _runLiveAction(
-                                    '已恢复策略。',
-                                    () => _liveGrid.resume(snapshot.data!.id),
-                                  ),
-                          onStop:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _runLiveAction(
-                                    '已停止策略。',
-                                    () => _liveGrid.stop(snapshot.data!.id),
-                                  ),
-                          onReconcile:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _reconcile(snapshot.data!),
-                          onRecoveryReport:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _recoveryReport(snapshot.data!),
-                          onEmergency:
-                              snapshot.data == null
-                                  ? null
-                                  : () => _runLiveAction(
-                                    '紧急退出完成。',
-                                    () => _liveGrid.emergencyExit(
-                                      snapshot.data!.id,
-                                    ),
-                                  ),
-                          onResetFreshStart: _resetForFreshStart,
-                        ),
+                      onPauseCancel: snapshot.data == null
+                          ? null
+                          : () => _runLiveAction(
+                                '已暂停：已请求撤销策略挂单。',
+                                () => _liveGrid.pauseCancelOrders(
+                                  snapshot.data!.id,
+                                ),
+                              ),
+                      onResume: snapshot.data == null
+                          ? null
+                          : () => _runLiveAction(
+                                '已恢复策略。',
+                                () => _liveGrid.resume(snapshot.data!.id),
+                              ),
+                      onStop: snapshot.data == null
+                          ? null
+                          : () => _runLiveAction(
+                                '已停止策略。',
+                                () => _liveGrid.stop(snapshot.data!.id),
+                              ),
+                      onReconcile: snapshot.data == null
+                          ? null
+                          : () => _reconcile(snapshot.data!),
+                      onRecoveryReport: snapshot.data == null
+                          ? null
+                          : () => _recoveryReport(snapshot.data!),
+                      onEmergency: snapshot.data == null
+                          ? null
+                          : () => _runLiveAction(
+                                '紧急退出完成。',
+                                () => _liveGrid.emergencyExit(
+                                  snapshot.data!.id,
+                                ),
+                              ),
+                      onResetFreshStart: _resetForFreshStart,
+                    ),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -1241,61 +1176,47 @@ class _StrategyPageState extends State<StrategyPage> {
                   stream: _liveGrid.watchActiveFuturesGridStrategy(
                     symbol: symbol,
                   ),
-                  builder:
-                      (context, snapshot) => _LiveFuturesGridSection(
-                        strategy: snapshot.data,
-                        liveGrid: _liveGrid,
-                        onCreateFutures:
-                            () => _createLiveStrategy(
-                              executionMode:
-                                  LiveSpotGridEditableConfig.futuresGridHedge,
-                            ),
-                        onEdit:
-                            snapshot.data == null
-                                ? null
-                                : () => _editLiveStrategy(snapshot.data!),
-                        onEditMaxOpenOrders:
-                            snapshot.data == null
-                                ? null
-                                : () => _editMaxOpenOrders(snapshot.data!),
-                        onEditFuturesLeverage:
-                            snapshot.data == null
-                                ? null
-                                : () => _editFuturesLeverage(snapshot.data!),
-                        onEditShortHedgeSettings:
-                            snapshot.data == null
-                                ? null
-                                : () => _editShortHedgeSettings(snapshot.data!),
-                        onCopy:
-                            snapshot.data == null
-                                ? null
-                                : () => _copyLiveStrategy(snapshot.data!),
-                        onDelete:
-                            snapshot.data == null
-                                ? null
-                                : () => _deleteLiveStrategy(snapshot.data!),
-                        onArchiveCurrent:
-                            snapshot.data == null
-                                ? null
-                                : () => _archiveCurrentStrategy(snapshot.data!),
-                        onMoveUp:
-                            snapshot.data == null
-                                ? null
-                                : () => _moveGridBand(snapshot.data!, up: true),
-                        onMoveDown:
-                            snapshot.data == null
-                                ? null
-                                : () =>
-                                    _moveGridBand(snapshot.data!, up: false),
-                        onStart:
-                            snapshot.data == null
-                                ? null
-                                : () => _startFuturesLongGrid(snapshot.data!),
-                        onRecover:
-                            snapshot.data == null
-                                ? null
-                                : () => _recoverFuturesLongGrid(snapshot.data!),
-                      ),
+                  builder: (context, snapshot) => _LiveFuturesGridSection(
+                    strategy: snapshot.data,
+                    liveGrid: _liveGrid,
+                    onCreateFutures: () => _createLiveStrategy(
+                      executionMode:
+                          LiveSpotGridEditableConfig.futuresGridHedge,
+                    ),
+                    onEdit: snapshot.data == null
+                        ? null
+                        : () => _editLiveStrategy(snapshot.data!),
+                    onEditMaxOpenOrders: snapshot.data == null
+                        ? null
+                        : () => _editMaxOpenOrders(snapshot.data!),
+                    onEditFuturesLeverage: snapshot.data == null
+                        ? null
+                        : () => _editFuturesLeverage(snapshot.data!),
+                    onEditShortHedgeSettings: snapshot.data == null
+                        ? null
+                        : () => _editShortHedgeSettings(snapshot.data!),
+                    onCopy: snapshot.data == null
+                        ? null
+                        : () => _copyLiveStrategy(snapshot.data!),
+                    onDelete: snapshot.data == null
+                        ? null
+                        : () => _deleteLiveStrategy(snapshot.data!),
+                    onArchiveCurrent: snapshot.data == null
+                        ? null
+                        : () => _archiveCurrentStrategy(snapshot.data!),
+                    onMoveUp: snapshot.data == null
+                        ? null
+                        : () => _moveGridBand(snapshot.data!, up: true),
+                    onMoveDown: snapshot.data == null
+                        ? null
+                        : () => _moveGridBand(snapshot.data!, up: false),
+                    onStart: snapshot.data == null
+                        ? null
+                        : () => _startFuturesLongGrid(snapshot.data!),
+                    onRecover: snapshot.data == null
+                        ? null
+                        : () => _recoverFuturesLongGrid(snapshot.data!),
+                  ),
                 ),
               ],
             );
@@ -1593,10 +1514,9 @@ class _PreflightIssueTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        issue.status == 'failed'
-            ? Colors.red.shade700
-            : issue.status == 'blocked'
+    final color = issue.status == 'failed'
+        ? Colors.red.shade700
+        : issue.status == 'blocked'
             ? Colors.orange.shade700
             : Colors.green.shade700;
     return Card(
@@ -1758,52 +1678,46 @@ class _ConflictStrategyCard extends StatelessWidget {
                   child: const Text('安全停止'),
                 ),
                 FilledButton.tonal(
-                  onPressed:
-                      item.binanceActiveOrders == 0
-                          ? null
-                          : () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text('撤销 Binance 挂单'),
-                                    content: Text(
-                                      '将撤销该旧策略关联的本程序现货挂单 ${item.binanceActiveOrders} 笔。'
-                                      '不会撤销非本程序订单。确认继续？',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed:
-                                            () => Navigator.of(
-                                              context,
-                                            ).pop(false),
-                                        child: const Text('取消'),
-                                      ),
-                                      FilledButton(
-                                        onPressed:
-                                            () =>
-                                                Navigator.of(context).pop(true),
-                                        child: const Text('确认撤销'),
-                                      ),
-                                    ],
-                                  ),
-                            );
-                            if (confirmed == true) {
-                              await onCancelExchangeOrders();
-                            }
-                          },
+                  onPressed: item.binanceActiveOrders == 0
+                      ? null
+                      : () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('撤销 Binance 挂单'),
+                              content: Text(
+                                '将撤销该旧策略关联的本程序现货挂单 ${item.binanceActiveOrders} 笔。'
+                                '不会撤销非本程序订单。确认继续？',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(
+                                    context,
+                                  ).pop(false),
+                                  child: const Text('取消'),
+                                ),
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: const Text('确认撤销'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            await onCancelExchangeOrders();
+                          }
+                        },
                   child: const Text('撤销 Binance 挂单'),
                 ),
                 Tooltip(
-                  message:
-                      item.canMarkStopped
-                          ? '满足安全条件'
-                          : item.blockingReasons.join('；'),
+                  message: item.canMarkStopped
+                      ? '满足安全条件'
+                      : item.blockingReasons.join('；'),
                   child: FilledButton(
-                    onPressed:
-                        item.canMarkStopped
-                            ? () => unawaited(onMarkStopped())
-                            : null,
+                    onPressed: item.canMarkStopped
+                        ? () => unawaited(onMarkStopped())
+                        : null,
                     child: const Text('标记为已停止'),
                   ),
                 ),
@@ -1941,10 +1855,9 @@ class _LiveFuturesGridSection extends StatelessWidget {
               ],
             ),
             FutureBuilder<LiveSpotGridEditableConfig?>(
-              future:
-                  strategy == null
-                      ? Future.value(null)
-                      : liveGrid.loadEditableConfig(strategy.id),
+              future: strategy == null
+                  ? Future.value(null)
+                  : liveGrid.loadEditableConfig(strategy.id),
               builder: (context, snapshot) {
                 final config = snapshot.data;
                 if (strategy == null) {
@@ -2066,14 +1979,15 @@ class _FuturesLongRuntimeStatusCard extends StatelessWidget {
       stream: liveGrid.watchGridLevels(strategy.id),
       builder: (context, levelSnapshot) {
         return StreamBuilder<List<Order>>(
-          stream:
-              (db.select(db.orders)..where(
-                (tbl) =>
-                    tbl.strategyId.equals(strategy.id) &
-                    tbl.source.equals(
-                      AutoSpotGridExecutionService.futuresLongSource,
-                    ),
-              )).watch(),
+          stream: (db.select(db.orders)
+                ..where(
+                  (tbl) =>
+                      tbl.strategyId.equals(strategy.id) &
+                      tbl.source.equals(
+                        AutoSpotGridExecutionService.futuresLongSource,
+                      ),
+                ))
+              .watch(),
           builder: (context, orderSnapshot) {
             final summary = _FuturesLongRuntimeSummary.from(
               strategy: strategy,
@@ -2177,13 +2091,11 @@ class _FuturesLongRuntimeSummary {
     final activeOrders = orders.where(_isActiveLongOrder).length;
     final waitingBuyLevels = levels.where(_isWaitingLongBuyLevel).length;
     final openLongLevels = levels.where(_isOpenLongLevel).length;
-    final errorLevels =
-        levels
-            .where(
-              (level) =>
-                  {level.status, level.lifecycleStatus}.contains('error'),
-            )
-            .length;
+    final errorLevels = levels
+        .where(
+          (level) => {level.status, level.lifecycleStatus}.contains('error'),
+        )
+        .length;
 
     late final String statusText;
     late final Color color;
@@ -2588,16 +2500,14 @@ class _ShortHedgeSettingsDialogState extends State<_ShortHedgeSettingsDialog> {
             FocusScope.of(context).unfocus();
             final navigator = Navigator.of(context);
             await Future<void>.delayed(Duration.zero);
-            final parsedMultiplier =
-                Decimal.tryParse(multiplier.text.trim()) ??
+            final parsedMultiplier = Decimal.tryParse(multiplier.text.trim()) ??
                 Decimal.parse('1.2');
             final parsedSpread = int.tryParse(spreadLevels.text.trim()) ?? 4;
             navigator.pop(
               _ShortHedgeSettingsResult(
-                multiplier:
-                    parsedMultiplier <= Decimal.zero
-                        ? Decimal.parse('1.2')
-                        : parsedMultiplier,
+                multiplier: parsedMultiplier <= Decimal.zero
+                    ? Decimal.parse('1.2')
+                    : parsedMultiplier,
                 spreadLevels: parsedSpread <= 0 ? 4 : parsedSpread,
               ),
             );
@@ -2818,10 +2728,9 @@ class _LiveStrategyEditDialogState extends State<_LiveStrategyEditDialog> {
                         ? '合约模式下 LONG 网格成交后，SHORT 侧按价格层对冲。'
                         : '现货模式下 Spot Grid 成交后，Future SHORT 侧按价格层对冲。',
                   ),
-                  onChanged:
-                      (value) => setState(() {
-                        enableFutureHedgeGrid = value;
-                      }),
+                  onChanged: (value) => setState(() {
+                    enableFutureHedgeGrid = value;
+                  }),
                 ),
               ),
               const SizedBox(
@@ -2914,10 +2823,9 @@ class _LiveStrategyEditDialogState extends State<_LiveStrategyEditDialog> {
     final lowerPrice = centerPrice * (Decimal.fromInt(1) - lowerRatio);
     final upperPrice = centerPrice * (Decimal.fromInt(1) + upperRatio);
     return LiveSpotGridEditableConfig(
-      name:
-          name.text.trim().isEmpty
-              ? '${widget.config.symbol} LIVE Spot Grid'
-              : name.text.trim(),
+      name: name.text.trim().isEmpty
+          ? '${widget.config.symbol} LIVE Spot Grid'
+          : name.text.trim(),
       symbol: widget.config.symbol,
       executionMode: executionMode,
       centerPrice: centerPrice,
@@ -2934,10 +2842,9 @@ class _LiveStrategyEditDialogState extends State<_LiveStrategyEditDialog> {
       singleGridAmount: decimal(singleAmount),
       maxLossUsdt: decimal(maxLoss),
       dailyMaxLossUsdt: decimal(dailyLoss),
-      outOfRangeAction:
-          outOfRange.text.trim().isEmpty
-              ? 'pauseAndReview'
-              : outOfRange.text.trim(),
+      outOfRangeAction: outOfRange.text.trim().isEmpty
+          ? 'pauseAndReview'
+          : outOfRange.text.trim(),
       enableFutureHedgeGrid: enableFutureHedgeGrid,
       futureGridOffset:
           integer(futureGridOffset) <= 0 ? 1 : integer(futureGridOffset),
@@ -2947,14 +2854,14 @@ class _LiveStrategyEditDialogState extends State<_LiveStrategyEditDialog> {
           decimal(longEntryTriggerDistance) < Decimal.zero
               ? Decimal.zero
               : decimal(longEntryTriggerDistance),
-      shortHedgeMultiplier:
-          decimal(shortHedgeMultiplier) <= Decimal.zero
-              ? Decimal.parse('1.2')
-              : decimal(shortHedgeMultiplier),
-      shortHedgeSpreadLevels:
-          integer(shortHedgeSpreadLevels) <= 0
-              ? 4
-              : integer(shortHedgeSpreadLevels),
+      longEntryTriggerMode: widget.config.longEntryTriggerMode,
+      longEntryPrehangLevels: widget.config.longEntryPrehangLevels,
+      shortHedgeMultiplier: decimal(shortHedgeMultiplier) <= Decimal.zero
+          ? Decimal.parse('1.2')
+          : decimal(shortHedgeMultiplier),
+      shortHedgeSpreadLevels: integer(shortHedgeSpreadLevels) <= 0
+          ? 4
+          : integer(shortHedgeSpreadLevels),
     );
   }
 
@@ -2965,17 +2872,17 @@ class _LiveStrategyEditDialogState extends State<_LiveStrategyEditDialog> {
 
   Decimal _lowerPercentFromPrices(LiveSpotGridEditableConfig config) {
     if (config.centerPrice <= Decimal.zero) return Decimal.zero;
-    final ratio = ((config.centerPrice - config.lowerPrice) /
-            config.centerPrice)
-        .toDecimal(scaleOnInfinitePrecision: 8);
+    final ratio =
+        ((config.centerPrice - config.lowerPrice) / config.centerPrice)
+            .toDecimal(scaleOnInfinitePrecision: 8);
     return ratio * Decimal.fromInt(100);
   }
 
   Decimal _upperPercentFromPrices(LiveSpotGridEditableConfig config) {
     if (config.centerPrice <= Decimal.zero) return Decimal.zero;
-    final ratio = ((config.upperPrice - config.centerPrice) /
-            config.centerPrice)
-        .toDecimal(scaleOnInfinitePrecision: 8);
+    final ratio =
+        ((config.upperPrice - config.centerPrice) / config.centerPrice)
+            .toDecimal(scaleOnInfinitePrecision: 8);
     return ratio * Decimal.fromInt(100);
   }
 }
@@ -3008,10 +2915,9 @@ class _BtcInventoryDialogState extends State<_BtcInventoryDialog> {
       text: widget.defaultExternalAll ? '0' : inventory.strategyBtc.toString(),
     );
     externalBtc = TextEditingController(
-      text:
-          widget.defaultExternalAll
-              ? inventory.accountTotalBtc.toString()
-              : inventory.externalBtc.toString(),
+      text: widget.defaultExternalAll
+          ? inventory.accountTotalBtc.toString()
+          : inventory.externalBtc.toString(),
     );
   }
 
@@ -3119,10 +3025,9 @@ class _BtcInventoryDialogState extends State<_BtcInventoryDialog> {
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed:
-              _currentResult() == null
-                  ? null
-                  : () => Navigator.of(context).pop(_currentResult()),
+          onPressed: _currentResult() == null
+              ? null
+              : () => Navigator.of(context).pop(_currentResult()),
           child: const Text('确认归属'),
         ),
       ],

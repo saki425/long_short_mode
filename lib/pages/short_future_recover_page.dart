@@ -199,7 +199,7 @@ class _RecoveryExecutionSwitchCard extends StatelessWidget {
             title: const Text('启用 Recovery Short 自动执行'),
             subtitle: Text(
               enabled
-                  ? '已开启：价格 WebSocket 触发时允许自动开空、平空和下边界减仓。'
+                  ? '已开启：自动提前挂开空单，并在满足条件后按入场价挂平空单。'
                   : '已关闭：只展示状态和对账信息，不会自动提交 Recovery Short 订单。',
             ),
             onChanged: (value) async {
@@ -254,9 +254,8 @@ class _RecoveryPreviewCard extends StatelessWidget {
             _kv('主格百分比', '1%'),
             _kv('保护起点', '-2.5%'),
             _kv('微格间距', '0.1%'),
-            _kv('下边界', '-7%'),
             _kv('权重', '默认 10% x 10'),
-            _kv('触发容差', '${_triggerTolerance(config)} USDT（复用开多提前触发）'),
+            _kv('平空触发', '原开空价（BUY STOP_MARKET）'),
             _kv('当前杠杆', '${config?.futuresLeverage ?? '-'}x'),
             const SizedBox(height: 12),
             const Divider(height: 1),
@@ -304,7 +303,6 @@ class _RecoveryPreviewCard extends StatelessWidget {
 
   List<_RecoveryPreview> _preview(Decimal center) {
     final items = <_RecoveryPreview>[];
-    final tolerance = _triggerTolerance(config);
     for (var i = 0; i < 10; i += 1) {
       final percent =
           Decimal.parse('-2.5') - Decimal.parse('0.1') * Decimal.fromInt(i);
@@ -313,22 +311,9 @@ class _RecoveryPreviewCard extends StatelessWidget {
       );
       final multiplier = Decimal.fromInt(1) + percentRatio;
       final price = center * multiplier;
-      items.add(
-        _RecoveryPreview(
-          i,
-          percent,
-          price,
-          price + tolerance,
-          price - tolerance,
-        ),
-      );
+      items.add(_RecoveryPreview(i, percent, price, price, price));
     }
     return items;
-  }
-
-  Decimal _triggerTolerance(LiveSpotGridEditableConfig? config) {
-    return config?.longEntryTriggerDistanceUsdt ??
-        AutoSpotGridExecutionService.defaultLongEntryTriggerDistanceUsdt;
   }
 }
 
@@ -523,7 +508,7 @@ class _ImplementationScopeCard extends StatelessWidget {
       '开空后先跌 0.1%，再允许原价平空。',
       '平空后先涨 0.1%，再允许重新开仓。',
       '状态已持久化到 recovery_short_levels，支持程序重启恢复。',
-      '下边界 -7% 时会尝试把 Recovery Short 超额部分减到 LONG 数量。',
+      '平空单由交易所 STOP_MARKET 条件单监控，不依赖本地价格区间穿越。',
     ];
     return Card(
       child: Padding(

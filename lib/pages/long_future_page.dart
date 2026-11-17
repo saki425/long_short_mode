@@ -59,16 +59,15 @@ class LongFuturePage extends StatelessWidget {
           final strategy = strategySnapshot.data;
           return Scaffold(
             appBar: AppBar(title: const Text('当前策略完整网格生命周期')),
-            body:
-                strategy == null
-                    ? Center(
-                      child: Text(
-                        '当前 ${active.displayName} 还没有 LIVE 合约 LONG 网格策略。\n'
-                        '请在 Strategy 页面创建“合约 LONG 网格 + SHORT 对冲”策略。',
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                    : _LongFutureBody(strategy: strategy, liveGrid: liveGrid),
+            body: strategy == null
+                ? Center(
+                    child: Text(
+                      '当前 ${active.displayName} 还没有 LIVE 合约 LONG 网格策略。\n'
+                      '请在 Strategy 页面创建“合约 LONG 网格 + SHORT 对冲”策略。',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : _LongFutureBody(strategy: strategy, liveGrid: liveGrid),
           );
         },
       );
@@ -88,9 +87,9 @@ class _LongFutureBody extends StatefulWidget {
 
 class _LongFutureBodyState extends State<_LongFutureBody> {
   static final Map<String, StreamSubscription<dynamic>>
-  _autoListenWsSubscriptions = {};
+      _autoListenWsSubscriptions = {};
   static final Map<String, StreamSubscription<dynamic>>
-  _autoListenPriceSubscriptions = {};
+      _autoListenPriceSubscriptions = {};
   static final Map<String, DateTime> _autoListenLastPriceSyncAt = {};
   static final Map<String, DateTime> _autoListenLastRestSyncAt = {};
   static final Map<String, DateTime> _autoListenRateLimitUntil = {};
@@ -168,16 +167,15 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
                   ordersById: ordersById,
                   ordersByGrid: ordersByGrid,
                 );
-                final filteredLevels =
-                    levels
-                        .where(
-                          (level) => _matchesLongFutureFilter(
-                            level: level,
-                            ordersById: ordersById,
-                            ordersByGrid: ordersByGrid,
-                          ),
-                        )
-                        .toList();
+                final filteredLevels = levels
+                    .where(
+                      (level) => _matchesLongFutureFilter(
+                        level: level,
+                        ordersById: ordersById,
+                        ordersByGrid: ordersByGrid,
+                      ),
+                    )
+                    .toList();
                 final completedLongCycles = levels.fold<int>(
                   0,
                   (sum, level) => sum + level.cycleNumber,
@@ -204,42 +202,37 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
                         runSpacing: 8,
                         children: [
                           FilledButton.icon(
-                            onPressed:
-                                _canStart(widget.strategy) && !_starting
-                                    ? _startFuturesLongGrid
-                                    : null,
+                            onPressed: _canStart(widget.strategy) && !_starting
+                                ? _startFuturesLongGrid
+                                : null,
                             icon: const Icon(Icons.play_arrow),
                             label: const Text('启动 LONG 网格'),
                           ),
                           OutlinedButton.icon(
-                            onPressed:
-                                !_starting
-                                    ? _stopFuturesLongGridCancelOpenOrders
-                                    : null,
+                            onPressed: !_starting
+                                ? _stopFuturesLongGridCancelOpenOrders
+                                : null,
                             icon: const Icon(Icons.stop_circle_outlined),
                             label: const Text('停止并撤销未成交 LONG'),
                           ),
                           FilledButton.tonalIcon(
-                            onPressed:
-                                !_starting
-                                    ? () => _closeFuturesPosition('LONG')
-                                    : null,
+                            onPressed: !_starting
+                                ? () => _closeFuturesPosition('LONG')
+                                : null,
                             icon: const Icon(Icons.south_east),
                             label: const Text('一键平仓多单'),
                           ),
                           FilledButton.tonalIcon(
-                            onPressed:
-                                !_starting
-                                    ? () => _closeFuturesPosition('SHORT')
-                                    : null,
+                            onPressed: !_starting
+                                ? () => _closeFuturesPosition('SHORT')
+                                : null,
                             icon: const Icon(Icons.north_east),
                             label: const Text('一键平仓空单'),
                           ),
                           OutlinedButton.icon(
-                            onPressed:
-                                !_starting
-                                    ? () => setState(() => _message = '')
-                                    : null,
+                            onPressed: !_starting
+                                ? () => setState(() => _message = '')
+                                : null,
                             icon: const Icon(Icons.clear),
                             label: const Text('清空提示'),
                           ),
@@ -255,22 +248,20 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
                             label: const Text('修复释放层'),
                           ),
                           OutlinedButton.icon(
-                            onPressed:
-                                !_starting
-                                    ? () => _reconcileFuturesLongGrid(
+                            onPressed: !_starting
+                                ? () => _reconcileFuturesLongGrid(
                                       includeHistory: false,
                                     )
-                                    : null,
+                                : null,
                             icon: const Icon(Icons.sync),
                             label: const Text('轻量对账'),
                           ),
                           OutlinedButton.icon(
-                            onPressed:
-                                !_starting
-                                    ? () => _reconcileFuturesLongGrid(
+                            onPressed: !_starting
+                                ? () => _reconcileFuturesLongGrid(
                                       includeHistory: true,
                                     )
-                                    : null,
+                                : null,
                             icon: const Icon(Icons.fact_check_outlined),
                             label: const Text('完整对账'),
                           ),
@@ -282,12 +273,18 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
                                 const Text('自动监听'),
                                 Switch(
                                   value: _autoListening,
-                                  onChanged:
-                                      (value) =>
-                                          unawaited(_setAutoListening(value)),
+                                  onChanged: (value) =>
+                                      unawaited(_setAutoListening(value)),
                                 ),
                               ],
                             ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: !_starting && config != null
+                                ? () => _configureLongEntry(config)
+                                : null,
+                            icon: const Icon(Icons.tune),
+                            label: const Text('LONG 触发配置'),
                           ),
                         ],
                       ),
@@ -441,18 +438,16 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             FilledButton.icon(
-              onPressed:
-                  _starting
-                      ? null
-                      : () => _reconcileFuturesLongGrid(includeHistory: false),
+              onPressed: _starting
+                  ? null
+                  : () => _reconcileFuturesLongGrid(includeHistory: false),
               icon: const Icon(Icons.sync),
               label: const Text('轻量对账'),
             ),
             OutlinedButton.icon(
-              onPressed:
-                  _starting
-                      ? null
-                      : () => _reconcileFuturesLongGrid(includeHistory: true),
+              onPressed: _starting
+                  ? null
+                  : () => _reconcileFuturesLongGrid(includeHistory: true),
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('完整对账'),
             ),
@@ -470,6 +465,24 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
               label: Text(
                 '价格源: ${config?.futuresPriceSource ?? LiveSpotGridEditableConfig.futuresMarkPrice}',
               ),
+            ),
+            Chip(
+              label: Text(
+                '开多模式: ${_longEntryModeText(config?.longEntryTriggerMode)}',
+              ),
+            ),
+            Chip(
+              label: Text(
+                '提前距离: ${config?.longEntryTriggerDistanceUsdt ?? AutoSpotGridExecutionService.defaultLongEntryTriggerDistanceUsdt} USDT',
+              ),
+            ),
+            Chip(
+              label: Text(
+                '预挂层数: ${config?.longEntryPrehangLevels ?? LiveSpotGridEditableConfig.defaultLongEntryPrehangLevels}',
+              ),
+            ),
+            Chip(
+              label: Text('最大活动挂单: ${config?.maxOpenOrders ?? 4}'),
             ),
             const Chip(label: Text('持仓模式要求: Hedge Mode')),
           ],
@@ -525,13 +538,171 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
     );
   }
 
+  String _longEntryModeText(String? mode) {
+    return mode == LiveSpotGridEditableConfig.longEntryTriggerModePrehang
+        ? '预挂多层'
+        : '接近价格触发';
+  }
+
+  Future<void> _configureLongEntry(
+    LiveSpotGridEditableConfig config,
+  ) async {
+    var mode = config.longEntryTriggerMode;
+    final distanceController = TextEditingController(
+      text: config.longEntryTriggerDistanceUsdt.toString(),
+    );
+    final prehangController = TextEditingController(
+      text: config.longEntryPrehangLevels.toString(),
+    );
+    final maxOrdersController = TextEditingController(
+      text: config.maxOpenOrders.toString(),
+    );
+    final result = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('LONG 下单触发配置'),
+              content: SizedBox(
+                width: 430,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: mode,
+                        decoration: const InputDecoration(
+                          labelText: 'LONG 下单触发模式',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: LiveSpotGridEditableConfig
+                                .longEntryTriggerModeNearPrice,
+                            child: Text('接近价格触发'),
+                          ),
+                          DropdownMenuItem(
+                            value: LiveSpotGridEditableConfig
+                                .longEntryTriggerModePrehang,
+                            child: Text('预挂多层'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => mode = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: distanceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '提前触发距离 USDT',
+                          helperText: '接近价格触发模式生效；预挂多层模式忽略该值。',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: prehangController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '预挂层数',
+                          helperText: '预挂模式下维护的初始/动态 BUY 层数。',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: maxOrdersController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '最大活动挂单数',
+                          helperText: '所有 LONG 活动订单的硬上限。',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '预挂多层只会提交 buyPrice 不高于当前 Mark Price 的订单，不会挂高于当前价的 BUY。',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop({
+                      'mode': mode,
+                      'distance': distanceController.text,
+                      'prehangLevels': prehangController.text,
+                      'maxOrders': maxOrdersController.text,
+                    });
+                  },
+                  child: const Text('保存'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    distanceController.dispose();
+    prehangController.dispose();
+    maxOrdersController.dispose();
+    if (result == null || !mounted) {
+      return;
+    }
+    final distance = Decimal.tryParse('${result['distance']}');
+    final prehangLevels = int.tryParse('${result['prehangLevels']}');
+    final maxOrders = int.tryParse('${result['maxOrders']}');
+    if (distance == null || prehangLevels == null || maxOrders == null) {
+      setState(() => _message = 'LONG 触发配置保存失败：请输入合法数字。');
+      return;
+    }
+    try {
+      await widget.liveGrid.updateFuturesLongTriggerSettings(
+        widget.strategy.id,
+        triggerMode: '${result['mode']}',
+        triggerDistanceUsdt: distance,
+        prehangLevels: prehangLevels,
+        maxOpenOrders: maxOrders,
+      );
+      if (!mounted) return;
+      setState(() {
+        _configFuture = widget.liveGrid.loadEditableConfig(widget.strategy.id);
+        _message = 'LONG 触发配置已保存。';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _message = 'LONG 触发配置保存失败: $error');
+      }
+    }
+  }
+
   Stream<List<Order>> _watchFuturesLongOrders(String strategyId) {
     final db = Get.find<AppDatabase>();
-    return (db.select(db.orders)..where(
-      (tbl) =>
-          tbl.strategyId.equals(strategyId) &
-          tbl.source.equals(AutoSpotGridExecutionService.futuresLongSource),
-    )).watch();
+    return (db.select(db.orders)
+          ..where(
+            (tbl) =>
+                tbl.strategyId.equals(strategyId) &
+                tbl.source
+                    .equals(AutoSpotGridExecutionService.futuresLongSource),
+          ))
+        .watch();
   }
 
   Stream<List<ExchangeOpenOrder>> _watchBinanceFuturesOpenOrders(
@@ -548,9 +719,9 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
           )
           ..orderBy([
             (tbl) => OrderingTerm(
-              expression: tbl.updatedAt,
-              mode: OrderingMode.desc,
-            ),
+                  expression: tbl.updatedAt,
+                  mode: OrderingMode.desc,
+                ),
           ]))
         .watch();
   }
@@ -610,25 +781,25 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
     return switch (_filter) {
       _LongFutureLifecycleFilter.all => true,
       _LongFutureLifecycleFilter.waitingBuy => _isWaitingBuyCycle(
-        level,
-        currentOrder,
-      ),
+          level,
+          currentOrder,
+        ),
       _LongFutureLifecycleFilter.open => _isBinanceOpenCycle(
-        level,
-        currentOrder,
-      ),
+          level,
+          currentOrder,
+        ),
       _LongFutureLifecycleFilter.waitingSell => _isWaitingSellCycle(
-        level,
-        currentOrder,
-      ),
+          level,
+          currentOrder,
+        ),
       _LongFutureLifecycleFilter.sellSubmitting => _isSellSubmittingCycle(
-        level,
-        currentOrder,
-      ),
+          level,
+          currentOrder,
+        ),
       _LongFutureLifecycleFilter.completed => _isCompletedCycle(
-        level,
-        currentOrder,
-      ),
+          level,
+          currentOrder,
+        ),
       _LongFutureLifecycleFilter.error => _isErrorCycle(level, currentOrder),
     };
   }
@@ -769,17 +940,15 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
     );
     final showSellCycleInfo = _showSellCycleInfo(level, currentOrder);
     final displayedSellOrder = showSellCycleInfo ? recentSellOrder : null;
-    final displayedSellOrderId =
-        showSellCycleInfo
-            ? (recentSellOrder?.id ?? level.lastSellOrderId)
-            : '-';
+    final displayedSellOrderId = showSellCycleInfo
+        ? (recentSellOrder?.id ?? level.lastSellOrderId)
+        : '-';
     final currentSide = _currentSide(level, currentOrder);
     final needsReplacement = _needsLongReplacement(level, currentOrder);
     final error = _orderError(level, currentOrder);
     final updatedAt = _latestUpdatedAt(level, currentOrder);
     final hasBlockingOrder = levelOrders.any(_isBlockingOrder);
-    final canSubmitBuy =
-        _canSubmitLongBuy(level, hasBlockingOrder) ||
+    final canSubmitBuy = _canSubmitLongBuy(level, hasBlockingOrder) ||
         (!hasBlockingOrder && _releasedLongBuyCanResubmit(levelOrders)) ||
         _staleLongBuyStateCanResubmit(
           level: level,
@@ -899,10 +1068,9 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
         ),
       );
     } else {
-      final label =
-          hasActiveOrder
-              ? '已有活动单'
-              : needsReplacement
+      final label = hasActiveOrder
+          ? '已有活动单'
+          : needsReplacement
               ? '等待处理'
               : '不可操作';
       actions.add(
@@ -959,13 +1127,11 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
       if (!mounted) return;
       final status = level.lifecycleStatus ?? level.status;
       setState(
-        () =>
-            _message =
-                repaired
-                    ? '价格层 ${level.gridIndex} 修复完成。'
-                    : status == 'buyFilled'
-                    ? '价格层 ${level.gridIndex} 已开多成交，当前不是本地残留修复场景；请点击该行“补平多”提交 reduceOnly 平多挂单。'
-                    : '价格层 ${level.gridIndex} 没有可修复的本地残留或仍存在真实活动单。',
+        () => _message = repaired
+            ? '价格层 ${level.gridIndex} 修复完成。'
+            : status == 'buyFilled'
+                ? '价格层 ${level.gridIndex} 已开多成交，当前不是本地残留修复场景；请点击该行“补平多”提交 reduceOnly 平多挂单。'
+                : '价格层 ${level.gridIndex} 没有可修复的本地残留或仍存在真实活动单。',
       );
     } catch (error) {
       if (!mounted) return;
@@ -980,27 +1146,26 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _confirmRenewLongGridLevel(GridLevel level) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('确认 Renew 当前层'),
-            content: SelectableText(
-              '价格层: ${level.gridIndex}\n'
-              '当前状态: ${level.lifecycleStatus ?? level.status}\n'
-              'BUY价格: ${level.buyPrice ?? level.price}\n\n'
-              'Renew 会把当前层释放为 LONG BUY / waitingBuy，并把该层旧 BUY 成交记录标记为不再参与生命周期计算。\n\n'
-              'Renew 不会立即提交订单；后续价格 WebSocket 检测到价格进入配置范围时，会自动提交该层 LONG BUY。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认 Renew'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('确认 Renew 当前层'),
+        content: SelectableText(
+          '价格层: ${level.gridIndex}\n'
+          '当前状态: ${level.lifecycleStatus ?? level.status}\n'
+          'BUY价格: ${level.buyPrice ?? level.price}\n\n'
+          'Renew 会把当前层释放为 LONG BUY / waitingBuy，并把该层旧 BUY 成交记录标记为不再参与生命周期计算。\n\n'
+          'Renew 不会立即提交订单；后续价格 WebSocket 检测到价格进入配置范围时，会自动提交该层 LONG BUY。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认 Renew'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -1011,9 +1176,8 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
       await widget.liveGrid.renewFuturesLongGridLevel(level.id);
       if (!mounted) return;
       setState(
-        () =>
-            _message =
-                '价格层 ${level.gridIndex} 已 Renew 为 LONG BUY，等待价格进入配置范围后自动挂单。',
+        () => _message =
+            '价格层 ${level.gridIndex} 已 Renew 为 LONG BUY，等待价格进入配置范围后自动挂单。',
       );
     } catch (error) {
       if (!mounted) return;
@@ -1282,10 +1446,11 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
     _restoringAutoListening = true;
     try {
       final db = Get.find<AppDatabase>();
-      final row =
-          await (db.select(db.appSettings)..where(
-            (tbl) => tbl.key.equals(_autoListeningKey(strategyId)),
-          )).getSingleOrNull();
+      final row = await (db.select(db.appSettings)
+            ..where(
+              (tbl) => tbl.key.equals(_autoListeningKey(strategyId)),
+            ))
+          .getSingleOrNull();
       final enabled = row?.value == 'true';
       if (!mounted) return;
       setState(() {
@@ -1308,9 +1473,7 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _setAutoListening(bool enabled) async {
     final strategyId = widget.strategy.id;
     final db = Get.find<AppDatabase>();
-    await db
-        .into(db.appSettings)
-        .insertOnConflictUpdate(
+    await db.into(db.appSettings).insertOnConflictUpdate(
           AppSettingsCompanion.insert(
             key: _autoListeningKey(strategyId),
             value: enabled ? 'true' : 'false',
@@ -1404,41 +1567,47 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
       return;
     }
     final normalizedSymbol = symbol.toUpperCase();
-    _autoListenWsSubscriptions[strategyId] = widget
-        .liveGrid
-        .liveExecution
-        .futuresUserOrderUpdates
-        .where(
-          (event) =>
-              event.strategyId == strategyId &&
-              event.symbol == normalizedSymbol &&
-              event.source == AutoSpotGridExecutionService.futuresLongSource &&
-              event.status == 'filled',
-        )
-        .listen((event) {
-          if (event.side == 'BUY') {
-            final gridLevelId = event.gridLevelId;
-            if (gridLevelId != null && gridLevelId.isNotEmpty) {
-              unawaited(_submitLongSellAfterBuyFilled(gridLevelId));
-            } else {
-              unawaited(
-                _runAutoLongSync(
-                  strategyId: strategyId,
-                  symbol: symbol,
-                  refreshFirst: false,
-                  verifyAvailableQuantity: false,
-                ),
-              );
-            }
-            return;
-          }
-          if (event.side == 'SELL') {
-            unawaited(_submitTriggeredLongBuy(strategyId));
-          }
-        });
+    _autoListenWsSubscriptions[strategyId] =
+        widget.liveGrid.liveExecution.futuresUserOrderUpdates
+            .where(
+      (event) =>
+          event.strategyId == strategyId &&
+          event.symbol == normalizedSymbol &&
+          event.source == AutoSpotGridExecutionService.futuresLongSource &&
+          event.status == 'filled',
+    )
+            .listen((event) {
+      if (event.side == 'BUY') {
+        final gridLevelId = event.gridLevelId;
+        if (gridLevelId != null && gridLevelId.isNotEmpty) {
+          unawaited(
+            _submitLongSellAfterBuyFilled(
+              gridLevelId,
+              strategyId: strategyId,
+            ),
+          );
+        } else {
+          unawaited(
+            _runAutoLongSync(
+              strategyId: strategyId,
+              symbol: symbol,
+              refreshFirst: false,
+              verifyAvailableQuantity: false,
+            ),
+          );
+        }
+        return;
+      }
+      if (event.side == 'SELL') {
+        unawaited(_submitTriggeredLongBuy(strategyId));
+      }
+    });
   }
 
-  Future<void> _submitLongSellAfterBuyFilled(String gridLevelId) async {
+  Future<void> _submitLongSellAfterBuyFilled(
+    String gridLevelId, {
+    required String strategyId,
+  }) async {
     if (_autoSyncRunning) {
       return;
     }
@@ -1448,6 +1617,14 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
         gridLevelId,
         verifyAvailableQuantity: false,
       );
+      // In prehang mode this immediately replenishes the layer that was
+      // consumed by the fill, subject to the current-price guard and the
+      // configured active-order limit.
+      final config = await widget.liveGrid.loadEditableConfig(strategyId);
+      if (config?.longEntryTriggerMode ==
+          LiveSpotGridEditableConfig.longEntryTriggerModePrehang) {
+        await widget.liveGrid.submitTriggeredFuturesLongBuyOrders(strategyId);
+      }
     } catch (error) {
       if (mounted && _autoListening) {
         setState(() => _message = 'LONG BUY 成交后提交平多失败: $error');
@@ -1466,23 +1643,20 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
     }
     final normalizedSymbol = symbol.toUpperCase();
     _autoListenPriceSubscriptions[strategyId] = widget
-        .liveGrid
-        .marketData
-        .futuresMarkPriceStream
+        .liveGrid.marketData.futuresMarkPriceStream
         .where((event) => event.symbol.toUpperCase() == normalizedSymbol)
         .listen((_) {
-          if (_autoSyncRunning) {
-            return;
-          }
-          final now = DateTime.now();
-          final last = _autoListenLastPriceSyncAt[strategyId];
-          if (last != null &&
-              now.difference(last) < _autoListenPriceSyncInterval) {
-            return;
-          }
-          _autoListenLastPriceSyncAt[strategyId] = now;
-          unawaited(_submitTriggeredLongBuy(strategyId));
-        });
+      if (_autoSyncRunning) {
+        return;
+      }
+      final now = DateTime.now();
+      final last = _autoListenLastPriceSyncAt[strategyId];
+      if (last != null && now.difference(last) < _autoListenPriceSyncInterval) {
+        return;
+      }
+      _autoListenLastPriceSyncAt[strategyId] = now;
+      unawaited(_submitTriggeredLongBuy(strategyId));
+    });
   }
 
   Future<void> _submitTriggeredLongBuy(String strategyId) async {
@@ -1555,11 +1729,9 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
       }
       if (mounted && _autoListening && strategyId == widget.strategy.id) {
         setState(
-          () =>
-              _message =
-                  rateLimited
-                      ? 'LONG 自动监听触发 Binance 频率限制，已暂停 REST 对账 2 分钟，期间继续使用 WebSocket 轻量推进。'
-                      : 'LONG 自动监听同步失败: $error',
+          () => _message = rateLimited
+              ? 'LONG 自动监听触发 Binance 频率限制，已暂停 REST 对账 2 分钟，期间继续使用 WebSocket 轻量推进。'
+              : 'LONG 自动监听同步失败: $error',
         );
       }
     } finally {
@@ -1684,28 +1856,27 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _confirmSubmitLongBuy(GridLevel level) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('确认 LONG 挂单'),
-            content: SelectableText(
-              '价格层: ${level.gridIndex}\n'
-              '方向: BUY / LONG\n'
-              '开多价格: ${level.buyPrice ?? level.price}\n'
-              '平多价格: ${level.sellPrice ?? '-'}\n'
-              '数量: ${level.plannedQuantity}\n\n'
-              '提交前会检查该层没有活动订单、Futures 双向持仓模式和 Binance 交易规则。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认挂单'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('确认 LONG 挂单'),
+        content: SelectableText(
+          '价格层: ${level.gridIndex}\n'
+          '方向: BUY / LONG\n'
+          '开多价格: ${level.buyPrice ?? level.price}\n'
+          '平多价格: ${level.sellPrice ?? '-'}\n'
+          '数量: ${level.plannedQuantity}\n\n'
+          '提交前会检查该层没有活动订单、Futures 双向持仓模式和 Binance 交易规则。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认挂单'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -1735,27 +1906,26 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _confirmSubmitLongSell(GridLevel level) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('确认补平多'),
-            content: SelectableText(
-              '价格层: ${level.gridIndex}\n'
-              '方向: SELL / LONG\n'
-              '平多价格: ${level.sellPrice ?? '-'}\n'
-              '计划数量: ${level.plannedQuantity}\n\n'
-              '这会提交当前价格层的 LONG SELL 限价平多单，不会处理其他价格层。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认补平多'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('确认补平多'),
+        content: SelectableText(
+          '价格层: ${level.gridIndex}\n'
+          '方向: SELL / LONG\n'
+          '平多价格: ${level.sellPrice ?? '-'}\n'
+          '计划数量: ${level.plannedQuantity}\n\n'
+          '这会提交当前价格层的 LONG SELL 限价平多单，不会处理其他价格层。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认补平多'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -1785,26 +1955,25 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _confirmCloseLongGridLevel(GridLevel level) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('确认当前层平仓'),
-            content: SelectableText(
-              '价格层: ${level.gridIndex}\n'
-              '方向: SELL / LONG reduceOnly MARKET\n'
-              '计划平仓数量: ${level.plannedQuantity}\n\n'
-              '只平当前价格层对应的 LONG 多单数量。提交前会检查该层没有活动挂单，并按 Binance 当前可用 LONG 可平数量做上限。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认平仓当前层'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('确认当前层平仓'),
+        content: SelectableText(
+          '价格层: ${level.gridIndex}\n'
+          '方向: SELL / LONG reduceOnly MARKET\n'
+          '计划平仓数量: ${level.plannedQuantity}\n\n'
+          '只平当前价格层对应的 LONG 多单数量。提交前会检查该层没有活动挂单，并按 Binance 当前可用 LONG 可平数量做上限。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认平仓当前层'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -1834,25 +2003,24 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _confirmCancelLongGridLevel(GridLevel level) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('确认撤销当前层挂单'),
-            content: SelectableText(
-              '价格层: ${level.gridIndex}\n'
-              '当前订单: ${level.activeOrderId ?? level.linkedOrderId ?? '-'}\n\n'
-              '只撤销当前价格层的 Futures LONG 网格活动挂单。撤单完成后，该价格层会释放回等待提交/等待开多。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认撤单当前层'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('确认撤销当前层挂单'),
+        content: SelectableText(
+          '价格层: ${level.gridIndex}\n'
+          '当前订单: ${level.activeOrderId ?? level.linkedOrderId ?? '-'}\n\n'
+          '只撤销当前价格层的 Futures LONG 网格活动挂单。撤单完成后，该价格层会释放回等待提交/等待开多。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认撤单当前层'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -1860,17 +2028,16 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
       _message = '正在撤销价格层 ${level.gridIndex} 活动挂单...';
     });
     try {
-      final cancelled = await widget.liveGrid
-          .cancelFuturesLongGridLevelOpenOrders(level.id);
+      final cancelled =
+          await widget.liveGrid.cancelFuturesLongGridLevelOpenOrders(level.id);
       await widget.liveGrid.liveExecution.refreshFuturesSnapshotForSymbol(
         widget.strategy.symbol,
         includeHistory: false,
       );
       if (!mounted) return;
       setState(
-        () =>
-            _message =
-                '价格层 ${level.gridIndex} 撤单完成，已释放回等待提交/等待开多。撤销 $cancelled 单。',
+        () => _message =
+            '价格层 ${level.gridIndex} 撤单完成，已释放回等待提交/等待开多。撤销 $cancelled 单。',
       );
     } catch (error) {
       if (!mounted) return;
@@ -1905,24 +2072,23 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _startFuturesLongGrid() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('启动 LONG 网格'),
-            content: Text(
-              '这会在 Binance Futures 为 ${widget.strategy.symbol} 提交 LONG BUY 限价挂单，'
-              '使用合约账户资金，且要求真实资金开关已开启。确认继续？',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认启动'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('启动 LONG 网格'),
+        content: Text(
+          '这会在 Binance Futures 为 ${widget.strategy.symbol} 提交 LONG BUY 限价挂单，'
+          '使用合约账户资金，且要求真实资金开关已开启。确认继续？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认启动'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -2026,24 +2192,23 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
   Future<void> _stopFuturesLongGridCancelOpenOrders() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('停止并撤销未成交 LONG'),
-            content: Text(
-              '这会停止 ${widget.strategy.symbol} 当前合约 LONG 网格策略，并撤销本策略还没成交完的 LONG BUY 挂单。\n\n'
-              '已经成交的 LONG 持仓不会市价平仓，SHORT 对冲也不会处理。确认继续？',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('确认停止并撤单'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('停止并撤销未成交 LONG'),
+        content: Text(
+          '这会停止 ${widget.strategy.symbol} 当前合约 LONG 网格策略，并撤销本策略还没成交完的 LONG BUY 挂单。\n\n'
+          '已经成交的 LONG 持仓不会市价平仓，SHORT 对冲也不会处理。确认继续？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确认停止并撤单'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -2071,24 +2236,23 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
     final label = isLong ? '多单' : '空单';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('一键平仓$label'),
-            content: Text(
-              '这会对 ${widget.strategy.symbol} 当前 Futures $positionSide 持仓提交 reduceOnly 市价平仓单。\n\n'
-              '这个操作不会撤销网格挂单，也不会改变另一侧持仓。确认继续？',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text('确认平仓$label'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text('一键平仓$label'),
+        content: Text(
+          '这会对 ${widget.strategy.symbol} 当前 Futures $positionSide 持仓提交 reduceOnly 市价平仓单。\n\n'
+          '这个操作不会撤销网格挂单，也不会改变另一侧持仓。确认继续？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('确认平仓$label'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     setState(() {
@@ -2096,14 +2260,13 @@ class _LongFutureBodyState extends State<_LongFutureBody> {
       _message = '正在提交 $positionSide reduceOnly 市价平仓...';
     });
     try {
-      final report =
-          isLong
-              ? await widget.liveGrid.closeFuturesLongPosition(
-                widget.strategy.id,
-              )
-              : await widget.liveGrid.closeFuturesShortPosition(
-                widget.strategy.id,
-              );
+      final report = isLong
+          ? await widget.liveGrid.closeFuturesLongPosition(
+              widget.strategy.id,
+            )
+          : await widget.liveGrid.closeFuturesShortPosition(
+              widget.strategy.id,
+            );
       if (!mounted) return;
       setState(() => _message = report.toDisplayText());
     } catch (error) {

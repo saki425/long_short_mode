@@ -241,6 +241,35 @@ class BinanceFuturesAccountClient {
     return FuturesOpenOrder.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
+  Future<FuturesOpenOrder> placeStopMarketOrder({
+    required String symbol,
+    required String side,
+    required Decimal quantity,
+    required Decimal stopPrice,
+    required String clientOrderId,
+    String workingType = 'MARK_PRICE',
+    String positionSide = 'BOTH',
+    bool reduceOnly = false,
+  }) async {
+    final data = await _signedRequest(
+      method: 'POST',
+      path: '/v1/order',
+      params: {
+        'symbol': symbol,
+        'side': side,
+        'type': 'STOP_MARKET',
+        'stopPrice': stopPrice.toString(),
+        'quantity': quantity.toString(),
+        'newClientOrderId': clientOrderId,
+        'positionSide': positionSide,
+        'workingType': workingType,
+        if (positionSide == 'BOTH') 'reduceOnly': reduceOnly.toString(),
+        'newOrderRespType': 'RESULT',
+      },
+    );
+    return FuturesOpenOrder.fromJson(Map<String, dynamic>.from(data as Map));
+  }
+
   Future<void> cancelOrder({
     required String symbol,
     required String clientOrderId,
